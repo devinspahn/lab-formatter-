@@ -602,10 +602,7 @@ def update_question(report_id, question_id):
 # Health check endpoint
 @app.route('/api/health')
 def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'timestamp': datetime.now().isoformat()
-    }), 200
+    return '', 200  # Just return empty 200 OK response
 
 # Socket.IO event handlers
 @socketio.on('connect')
