@@ -3,11 +3,7 @@ import uuid
 import sqlite3
 import logging
 from datetime import datetime, timedelta
-try:
-    import jwt
-except ImportError:
-    from jwt import JWT, jwk_from_pem
-    jwt = JWT()
+import jwt
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, jsonify
