@@ -567,6 +567,11 @@ def update_question(report_id, question_id):
             conn.close()
         return jsonify({'error': str(e)}), 500
 
+# Health check endpoint
+@app.route('/api/health')
+def health_check():
+    return jsonify({"status": "healthy"}), 200
+
 # Socket.IO event handlers
 @socketio.on('connect')
 def handle_connect():

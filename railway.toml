@@ -1,0 +1,8 @@
+[build]
+builder = "nixpacks"
+buildCommand = "cd FlaskBackend && pip install -r requirements.txt"
+
+[deploy]
+startCommand = "cd FlaskBackend && python Formatting/app.py"
+healthcheckPath = "/api/health"
+restartPolicyType = "on_failure"
