@@ -46,6 +46,9 @@ socketio = SocketIO(
     engineio_logger=True
 )
 
+# Initialize database at startup
+init_db()
+
 # Google Docs API setup
 SCOPES = ['https://www.googleapis.com/auth/documents']
 SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
@@ -250,7 +253,7 @@ def update_lab_report(report_id):
         
         conn.commit()
         
-        # Get updated report
+        # Get the updated report
         c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
         report = dict(c.fetchone())
         
@@ -329,9 +332,10 @@ def add_question(report_id):
         logger.info(f"[ADD QUESTION] Received request for report {report_id}")
         logger.info(f"[ADD QUESTION] Request headers: {dict(request.headers)}")
         logger.info(f"[ADD QUESTION] Request method: {request.method}")
+        logger.info(f"[ADD QUESTION] Raw request data: {request.get_data()}")
         
         data = request.get_json()
-        logger.info(f"[ADD QUESTION] Request data: {data}")
+        logger.info(f"[ADD QUESTION] Parsed request data: {data}")
         
         if not data:
             logger.error("[ADD QUESTION] No data provided in request")
@@ -629,7 +633,6 @@ def handle_leave(data):
         emit('message', {'msg': f'Left room: {room}'})
 
 if __name__ == '__main__':
-    init_db()  # Initialize database tables
     port = int(os.getenv('PORT', 8080))
     socketio.run(app, 
                 host='0.0.0.0',
