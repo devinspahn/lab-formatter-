@@ -121,6 +121,14 @@ def get_db():
     db.row_factory = dict_factory
     return db
 
+# Add root endpoint for testing
+@app.route('/')
+def root():
+    return jsonify({
+        'status': 'ok',
+        'message': 'Lab Formatter API is running'
+    })
+
 @app.route('/api/lab-reports', methods=['POST'])
 def create_lab_report():
     conn = None
@@ -590,7 +598,10 @@ def update_question(report_id, question_id):
 # Health check endpoint
 @app.route('/api/health')
 def health_check():
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.now().isoformat()
+    }), 200
 
 # Socket.IO event handlers
 @socketio.on('connect')
