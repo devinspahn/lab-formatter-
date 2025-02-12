@@ -1,4 +1,4 @@
 [deploy]
-startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 'Formatting.app:app'"
+startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT 'Formatting.app:app'"
 healthcheckPath = "/api/health"
 restartPolicyType = "on_failure"

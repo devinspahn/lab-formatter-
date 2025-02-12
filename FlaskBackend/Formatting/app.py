@@ -619,9 +619,10 @@ def handle_leave(data):
 
 if __name__ == '__main__':
     init_db()  # Initialize database tables
-    port = int(os.getenv('PORT', PORT))
+    port = int(os.getenv('PORT', 8080))
     socketio.run(app, 
                 host='0.0.0.0',
                 port=port,
                 debug=ENV == 'development',
-                use_reloader=ENV == 'development')
+                use_reloader=ENV == 'development',
+                allow_unsafe_werkzeug=True)  # Allow binding to 0.0.0.0
