@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "cd FlaskBackend && pip install -r requirements.txt"
+buildCommand = "python -m ensurepip && python -m pip install --upgrade pip && cd FlaskBackend && pip install -r requirements.txt"
 
 [deploy]
 startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 'Formatting.app:app'"
