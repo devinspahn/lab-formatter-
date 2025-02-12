@@ -239,47 +239,76 @@ def get_lab_report(report_id):
 def update_lab_report(report_id):
     conn = None
     try:
-        data = request.json
+        logger.info(f"[UPDATE LAB] Received request for report {report_id}")
+        logger.info(f"[UPDATE LAB] Request headers: {dict(request.headers)}")
+        logger.info(f"[UPDATE LAB] Raw request data: {request.get_data(as_text=True)}")
+        
+        data = request.get_json()
+        if not data:
+            logger.error("[UPDATE LAB] No data provided in request")
+            return jsonify({'error': 'No data provided'}), 400
+            
+        required_fields = ['number', 'statement', 'authors']
+        for field in required_fields:
+            if field not in data:
+                logger.error(f"[UPDATE LAB] Missing required field: {field}")
+                return jsonify({'error': f'Missing required field: {field}'}), 400
+        
+        logger.info(f"[UPDATE LAB] Parsed request data: {data}")
+        
         conn = get_db()
         c = conn.cursor()
         
         # Check if report exists
         c.execute('SELECT id FROM lab_reports WHERE id = ?', (report_id,))
         if not c.fetchone():
+            logger.error(f"[UPDATE LAB] Lab report {report_id} not found")
             conn.close()
             return jsonify({'error': 'Lab report not found'}), 404
         
         # Update report
-        c.execute('''
-            UPDATE lab_reports 
-            SET number = ?, statement = ?, authors = ?
-            WHERE id = ?
-        ''', (data['number'], data['statement'], data['authors'], report_id))
-        
-        conn.commit()
-        
-        # Get the updated report
-        c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
-        report = dict(c.fetchone())
-        
-        # Get questions
-        c.execute('SELECT * FROM questions WHERE lab_report_id = ? ORDER BY created_at', (report_id,))
-        report['questions'] = [dict(q) for q in c.fetchall()]
-        
-        conn.close()
-        
-        # Emit socket event
-        socketio.emit('lab_report_updated', report, room=report_id)
-        
-        return jsonify(report), 200
-        
-    except sqlite3.Error as e:
-        logger.error(f"Database error: {str(e)}")
-        if conn:
+        try:
+            c.execute('''
+                UPDATE lab_reports 
+                SET number = ?, statement = ?, authors = ?
+                WHERE id = ?
+            ''', (data['number'], data['statement'], data['authors'], report_id))
+            
+            conn.commit()
+            logger.info(f"[UPDATE LAB] Successfully updated lab report {report_id}")
+            
+            # Get the updated report
+            c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
+            report = dict(c.fetchone())
+            
+            # Get questions
+            c.execute('SELECT * FROM questions WHERE lab_report_id = ? ORDER BY created_at', (report_id,))
+            questions = [dict(q) for q in c.fetchall()]
+            
+            # Get subtopics for each question
+            for q in questions:
+                c.execute('SELECT * FROM subtopics WHERE question_id = ? ORDER BY created_at', (q['id'],))
+                q['subtopics'] = [dict(s) for s in c.fetchall()]
+                
+            report['questions'] = questions
+            
             conn.close()
-        return jsonify({'error': f'Database error: {str(e)}'}), 500
+            
+            # Emit socket event
+            logger.info(f"[UPDATE LAB] Emitting lab_report_updated event for {report_id}")
+            socketio.emit('lab_report_updated', report, room=report_id)
+            
+            logger.info(f"[UPDATE LAB] Returning updated report: {report}")
+            return jsonify(report), 200
+            
+        except sqlite3.Error as e:
+            logger.error(f"[UPDATE LAB] Database error while updating: {str(e)}")
+            conn.rollback()
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
+            
     except Exception as e:
-        logger.error(f"Error updating lab report: {str(e)}")
+        logger.error(f"[UPDATE LAB] Unexpected error: {str(e)}")
+        logger.exception("[UPDATE LAB] Full traceback:")
         if conn:
             conn.close()
         return jsonify({'error': str(e)}), 500

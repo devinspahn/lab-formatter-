@@ -206,17 +206,35 @@ function App() {
     };
 
     const updateLabReport = async () => {
+        if (!reportId) {
+            console.error("No reportId found");
+            return alert("No active lab report! Please create a lab report first.");
+        }
+
         if (!reportNumber || !reportStatement || !reportAuthors) {
+            console.error("Missing required fields:", { reportNumber, reportStatement, reportAuthors });
             return alert("Please enter lab number, statement, and authors!");
         }
 
         try {
             setIsLoading(true);
-            const response = await axios.put(`${BACKEND_URL}/api/lab-reports/${reportId}`, {
+            const url = `${BACKEND_URL}/api/lab-reports/${reportId}`;
+            const data = {
                 number: reportNumber,
                 statement: reportStatement,
                 authors: reportAuthors
+            };
+
+            console.log("Updating lab report:", {
+                url,
+                data,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
             });
+
+            const response = await axios.put(url, data);
+            console.log("Lab report updated successfully:", response.data);
 
             // Update the local state with the response data
             if (response.data) {
@@ -230,8 +248,20 @@ function App() {
 
             alert('Lab details updated successfully!');
         } catch (error) {
-            console.error('Error updating lab report:', error);
-            alert('Failed to update lab report');
+            console.error('Error updating lab report:', {
+                error: error,
+                response: error.response?.data,
+                status: error.response?.status,
+                message: error.message,
+                config: error.config,
+                reportId: reportId,
+                data: {
+                    number: reportNumber,
+                    statement: reportStatement,
+                    authors: reportAuthors
+                }
+            });
+            alert(error.response?.data?.error || 'Failed to update lab report. Please try again.');
         } finally {
             setIsLoading(false);
         }
