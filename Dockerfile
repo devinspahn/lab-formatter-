@@ -2,10 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
+# Copy requirements first to leverage Docker cache
+COPY FlaskBackend/requirements.txt requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy the Flask application
+COPY FlaskBackend/Formatting ./Formatting
 
 EXPOSE 8080
 

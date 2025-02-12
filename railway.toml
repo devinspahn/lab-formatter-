@@ -1,12 +1,8 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "FlaskBackend/Dockerfile"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 'Formatting.app:app'"
 healthcheckPath = "/api/health"
 restartPolicyType = "on_failure"
 numReplicas = 1
-
-[nixpacks]
-python_version = "3.11"
