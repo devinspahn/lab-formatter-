@@ -19,7 +19,7 @@ load_dotenv()
 
 # Get environment variables or use defaults
 PORT = int(os.getenv('PORT', 8080))
-DATABASE_URL = os.getenv('DATABASE_URL', 'lab.db')
+DATABASE_URL = os.getenv('DATABASE_URL', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lab.db'))
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
 ENV = os.getenv('FLASK_ENV', 'production')
 
@@ -54,7 +54,7 @@ SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account
 def init_db():
     """Initialize the database schema"""
     try:
-        conn = get_db()
+        conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
         c = conn.cursor()
 
         # Create lab_reports table
@@ -101,16 +101,9 @@ def init_db():
         logger.info("Database initialized successfully")
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
-        if conn:
+        if 'conn' in locals() and conn:
             conn.close()
         raise e
-
-# Initialize database at startup
-try:
-    init_db()
-    logger.info("Database initialized at startup")
-except Exception as e:
-    logger.error(f"Failed to initialize database at startup: {str(e)}")
 
 def dict_factory(cursor, row):
     """Convert database row to dictionary with datetime handling"""
@@ -124,9 +117,17 @@ def dict_factory(cursor, row):
 
 def get_db():
     """Get database connection with datetime handling"""
-    db = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
-    db.row_factory = dict_factory
-    return db
+    conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = dict_factory
+    return conn
+
+# Initialize database at startup
+try:
+    init_db()
+    logger.info("Database initialized at startup")
+except Exception as e:
+    logger.error(f"Failed to initialize database at startup: {str(e)}")
+    raise e  # Re-raise to fail startup if database can't be initialized
 
 # Add root endpoint for testing
 @app.route('/')
