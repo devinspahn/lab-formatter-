@@ -3,7 +3,29 @@ import uuid
 import sqlite3
 import logging
 from datetime import datetime, timedelta
-import jwt
+import sys
+import subprocess
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Log Python path for debugging
+logger.info(f"Python Path: {sys.path}")
+
+# Try to install PyJWT if not found
+try:
+    import jwt
+except ImportError:
+    logger.error("JWT not found, attempting to install PyJWT...")
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT==2.10.1"])
+        import jwt
+        logger.info("Successfully installed PyJWT")
+    except Exception as e:
+        logger.error(f"Failed to install PyJWT: {str(e)}")
+        raise
+
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, jsonify
@@ -12,10 +34,6 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
