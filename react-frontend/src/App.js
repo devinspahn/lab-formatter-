@@ -245,6 +245,10 @@ function App() {
                 number: reportNumber,
                 statement: reportStatement,
                 authors: reportAuthors
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
             });
             
             console.log('Response:', response.data);
