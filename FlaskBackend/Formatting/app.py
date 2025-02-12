@@ -3,7 +3,11 @@ import uuid
 import sqlite3
 import logging
 from datetime import datetime, timedelta
-from jwt import encode, decode
+try:
+    import jwt
+except ImportError:
+    from jwt import JWT, jwk_from_pem
+    jwt = JWT()
 from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, jsonify
@@ -68,7 +72,7 @@ def token_required(f):
             return jsonify({'error': 'Token is missing'}), 401
             
         try:
-            data = decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+            data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
             current_user = data['username']
         except:
             return jsonify({'error': 'Token is invalid'}), 401
@@ -230,10 +234,10 @@ def login():
         
         if user and check_password_hash(user['password'], data['password']):
             logger.info(f"[LOGIN] Successfully authenticated user: {data['username']}")
-            token = encode({
+            token = jwt.encode({
                 'username': user['username'],
                 'exp': datetime.utcnow() + timedelta(days=1)
-            }, app.config['JWT_SECRET'])
+            }, app.config['JWT_SECRET'], algorithm="HS256")
             
             return jsonify({
                 'token': token,
@@ -253,7 +257,7 @@ def login():
 def get_profile():
     try:
         token = request.headers['Authorization'].replace('Bearer ', '')
-        data = decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+        data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
         
         conn = get_db()
         c = conn.cursor()
@@ -305,7 +309,7 @@ def create_lab_report():
         ''')
         
         token = request.headers['Authorization'].replace('Bearer ', '')
-        data_token = decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+        data_token = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
         current_user = data_token['username']
         
         c.execute(
