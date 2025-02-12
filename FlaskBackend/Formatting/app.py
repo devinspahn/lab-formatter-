@@ -199,7 +199,7 @@ def init_db():
         admin_user = c.fetchone()
         if admin_user:
             logger.info("[INIT_DB] Verified admin user exists")
-            logger.info(f"[INIT_DB] Admin username: {admin_user[0]}")
+            logger.info(f"[INIT_DB] Admin username: {admin_user['username'] if isinstance(admin_user, dict) else admin_user[0]}")
         else:
             logger.error("[INIT_DB] Failed to verify admin user")
         
