@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timedelta
 import sys
 import subprocess
+from dotenv import load_dotenv
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
