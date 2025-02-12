@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
+import axios from 'axios';
 import styles from './Login.module.css';
+
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8080';
 
 const Login = ({ onLogin }) => {
     const [username, setUsername] = useState('');
@@ -13,29 +16,39 @@ const Login = ({ onLogin }) => {
         setIsLoading(true);
 
         try {
-            const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/auth/login`, {
-                method: 'POST',
+            console.log('Attempting login with:', {
+                url: `${BACKEND_URL}/api/auth/login`,
+                username,
                 headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ username, password }),
+                    'Content-Type': 'application/json'
+                }
             });
 
-            const data = await response.json();
+            const response = await axios.post(`${BACKEND_URL}/api/auth/login`, {
+                username,
+                password
+            }, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
-            if (!response.ok) {
-                throw new Error(data.error || 'Login failed');
-            }
+            console.log('Login response:', response.data);
 
             // Store token and user info
-            localStorage.setItem('token', data.token);
-            localStorage.setItem('username', data.username);
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('username', response.data.username);
 
             // Call the onLogin callback with user data
-            onLogin(data);
+            onLogin(response.data);
             
         } catch (error) {
-            setError(error.message);
+            console.error('Login error:', {
+                error: error,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            setError(error.response?.data?.error || 'Login failed. Please try again.');
         } finally {
             setIsLoading(false);
         }

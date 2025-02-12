@@ -187,19 +187,27 @@ def root():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     try:
+        logger.info("[LOGIN] Received login request")
+        logger.info(f"[LOGIN] Request headers: {dict(request.headers)}")
+        logger.info(f"[LOGIN] Raw request data: {request.get_data(as_text=True)}")
+        
         data = request.get_json()
+        logger.info(f"[LOGIN] Parsed request data: {data}")
         
         if not data or 'username' not in data or 'password' not in data:
+            logger.error("[LOGIN] Missing username or password")
             return jsonify({'error': 'Missing username or password'}), 400
             
         conn = get_db()
         c = conn.cursor()
         
+        logger.info(f"[LOGIN] Looking up user: {data['username']}")
         c.execute('SELECT * FROM users WHERE username = ?', (data['username'],))
         user = c.fetchone()
         conn.close()
         
         if user and check_password_hash(user['password'], data['password']):
+            logger.info(f"[LOGIN] Successfully authenticated user: {data['username']}")
             token = jwt.encode({
                 'username': user['username'],
                 'exp': datetime.utcnow() + timedelta(days=1)
@@ -210,10 +218,12 @@ def login():
                 'username': user['username']
             }), 200
         
+        logger.error(f"[LOGIN] Invalid credentials for user: {data['username']}")
         return jsonify({'error': 'Invalid username or password'}), 401
         
     except Exception as e:
-        logger.error(f"Login error: {str(e)}")
+        logger.error(f"[LOGIN] Unexpected error: {str(e)}")
+        logger.exception("[LOGIN] Full traceback:")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/auth/profile', methods=['GET'])
