@@ -11,12 +11,9 @@ from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import logging
-from datetime import datetime
-import uuid
 from dotenv import load_dotenv
 
-# Set up logging
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -82,10 +79,16 @@ def token_required(f):
 # Database setup
 def init_db():
     """Initialize the database schema"""
+    conn = None
     try:
+        logger.info("[INIT_DB] Starting database initialization")
         conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
         c = conn.cursor()
+        
+        # Enable foreign keys
+        c.execute('PRAGMA foreign_keys = ON')
 
+        logger.info("[INIT_DB] Creating users table")
         # Create users table
         c.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -96,12 +99,19 @@ def init_db():
         ''')
 
         # Create admin user if not exists
+        logger.info("[INIT_DB] Checking for admin user")
         c.execute('SELECT username FROM users WHERE username = ?', ('admin',))
-        if not c.fetchone():
-            admin_password = generate_password_hash('admin123')  # Change in production
+        admin_exists = c.fetchone()
+        
+        if not admin_exists:
+            logger.info("[INIT_DB] Creating admin user")
+            admin_password = generate_password_hash('admin123')
             c.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', admin_password))
+            logger.info("[INIT_DB] Admin user created successfully")
+        else:
+            logger.info("[INIT_DB] Admin user already exists")
 
-        # Create lab_reports table
+        logger.info("[INIT_DB] Creating lab_reports table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS lab_reports (
             id TEXT PRIMARY KEY,
@@ -114,7 +124,7 @@ def init_db():
         )
         ''')
 
-        # Create questions table
+        logger.info("[INIT_DB] Creating questions table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS questions (
             id TEXT PRIMARY KEY,
@@ -126,7 +136,7 @@ def init_db():
         )
         ''')
 
-        # Create subtopics table
+        logger.info("[INIT_DB] Creating subtopics table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS subtopics (
             id TEXT PRIMARY KEY,
@@ -143,11 +153,23 @@ def init_db():
         ''')
 
         conn.commit()
+        logger.info("[INIT_DB] Database initialized successfully")
+        
+        # Verify admin user
+        c.execute('SELECT username, password FROM users WHERE username = ?', ('admin',))
+        admin_user = c.fetchone()
+        if admin_user:
+            logger.info("[INIT_DB] Verified admin user exists")
+            logger.info(f"[INIT_DB] Admin username: {admin_user[0]}")
+        else:
+            logger.error("[INIT_DB] Failed to verify admin user")
+        
         conn.close()
-        logger.info("Database initialized successfully")
+        
     except Exception as e:
-        logger.error(f"Error initializing database: {str(e)}")
-        if 'conn' in locals() and conn:
+        logger.error(f"[INIT_DB] Error initializing database: {str(e)}")
+        logger.exception("[INIT_DB] Full traceback:")
+        if conn:
             conn.close()
         raise e
 

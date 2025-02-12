@@ -1,12 +1,9 @@
-flask==2.3.3
-flask-cors==4.0.0
-flask-socketio==5.3.6
+Flask==2.3.3
+Flask-SocketIO==5.3.6
+Flask-CORS==4.0.0
 python-dotenv==1.0.0
 google-auth==2.22.0
 google-api-python-client==2.97.0
-eventlet==0.33.3
-gunicorn==21.2.0
-python-engineio==4.8.0
-python-socketio==5.10.0
+PyJWT==2.8.0
 Werkzeug==2.3.7
-SQLAlchemy==2.0.25
+gunicorn==21.2.0
