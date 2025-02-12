@@ -1,10 +1,16 @@
+import os
+import uuid
+import sqlite3
+import logging
+from datetime import datetime, timedelta
+import jwt
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
-import os
-import sqlite3
 import logging
 from datetime import datetime
 import uuid
@@ -17,23 +23,26 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Get environment variables or use defaults
-PORT = int(os.getenv('PORT', 8080))
+# Environment variables
 DATABASE_URL = os.getenv('DATABASE_URL', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lab.db'))
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
 ENV = os.getenv('FLASK_ENV', 'production')
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')  # Change in production
+PORT = int(os.getenv('PORT', 8080))
 
+# Initialize Flask app
 app = Flask(__name__)
 app.config['ENV'] = ENV
 app.config['DEBUG'] = ENV == 'development'
+app.config['JWT_SECRET'] = JWT_SECRET
 
 # Configure CORS
 CORS(app, resources={
     r"/*": {
         "origins": [CORS_ORIGIN],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type"],
-        "supports_credentials": False
+        "allow_headers": ["Content-Type", "Authorization"],
+        "supports_credentials": True
     }
 })
 
@@ -50,12 +59,47 @@ socketio = SocketIO(
 SCOPES = ['https://www.googleapis.com/auth/documents']
 SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
 
+# Token required decorator
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        if 'Authorization' in request.headers:
+            token = request.headers['Authorization'].replace('Bearer ', '')
+        
+        if not token:
+            return jsonify({'error': 'Token is missing'}), 401
+            
+        try:
+            data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+            current_user = data['username']
+        except:
+            return jsonify({'error': 'Token is invalid'}), 401
+            
+        return f(*args, **kwargs)
+    return decorated
+
 # Database setup
 def init_db():
     """Initialize the database schema"""
     try:
         conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
         c = conn.cursor()
+
+        # Create users table
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            username TEXT PRIMARY KEY,
+            password TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        ''')
+
+        # Create admin user if not exists
+        c.execute('SELECT username FROM users WHERE username = ?', ('admin',))
+        if not c.fetchone():
+            admin_password = generate_password_hash('admin123')  # Change in production
+            c.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', admin_password))
 
         # Create lab_reports table
         c.execute('''
@@ -64,7 +108,9 @@ def init_db():
             number TEXT NOT NULL,
             statement TEXT NOT NULL,
             authors TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_by TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (created_by) REFERENCES users (username)
         )
         ''')
 
@@ -137,7 +183,67 @@ def root():
         'message': 'Lab Formatter API is running'
     })
 
+# Authentication routes
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    try:
+        data = request.get_json()
+        
+        if not data or 'username' not in data or 'password' not in data:
+            return jsonify({'error': 'Missing username or password'}), 400
+            
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('SELECT * FROM users WHERE username = ?', (data['username'],))
+        user = c.fetchone()
+        conn.close()
+        
+        if user and check_password_hash(user['password'], data['password']):
+            token = jwt.encode({
+                'username': user['username'],
+                'exp': datetime.utcnow() + timedelta(days=1)
+            }, app.config['JWT_SECRET'])
+            
+            return jsonify({
+                'token': token,
+                'username': user['username']
+            }), 200
+        
+        return jsonify({'error': 'Invalid username or password'}), 401
+        
+    except Exception as e:
+        logger.error(f"Login error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/auth/profile', methods=['GET'])
+@token_required
+def get_profile():
+    try:
+        token = request.headers['Authorization'].replace('Bearer ', '')
+        data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+        
+        conn = get_db()
+        c = conn.cursor()
+        
+        c.execute('SELECT username, created_at FROM users WHERE username = ?', (data['username'],))
+        user = c.fetchone()
+        conn.close()
+        
+        if user:
+            return jsonify({
+                'username': user['username'],
+                'created_at': user['created_at']
+            }), 200
+            
+        return jsonify({'error': 'User not found'}), 404
+        
+    except Exception as e:
+        logger.error(f"Get profile error: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/lab-reports', methods=['POST'])
+@token_required
 def create_lab_report():
     conn = None
     try:
@@ -160,13 +266,19 @@ def create_lab_report():
                 number TEXT NOT NULL,
                 statement TEXT NOT NULL,
                 authors TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_by TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (created_by) REFERENCES users (username)
             )
         ''')
         
+        token = request.headers['Authorization'].replace('Bearer ', '')
+        data_token = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+        current_user = data_token['username']
+        
         c.execute(
-            'INSERT INTO lab_reports (id, number, statement, authors) VALUES (?, ?, ?, ?)',
-            (report_id, data['number'], data['statement'], data['authors'])
+            'INSERT INTO lab_reports (id, number, statement, authors, created_by) VALUES (?, ?, ?, ?, ?)',
+            (report_id, data['number'], data['statement'], data['authors'], current_user)
         )
         conn.commit()
         
@@ -194,6 +306,7 @@ def create_lab_report():
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>', methods=['GET'])
+@token_required
 def get_lab_report(report_id):
     conn = None
     try:
@@ -236,6 +349,7 @@ def get_lab_report(report_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>', methods=['PUT'])
+@token_required
 def update_lab_report(report_id):
     conn = None
     try:
@@ -314,6 +428,7 @@ def update_lab_report(report_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>', methods=['DELETE'])
+@token_required
 def delete_lab_report(report_id):
     conn = None
     try:
@@ -360,6 +475,7 @@ def delete_lab_report(report_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>/questions', methods=['POST'])
+@token_required
 def add_question(report_id):
     conn = None
     try:
@@ -436,6 +552,7 @@ def add_question(report_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>/questions/<question_id>/subtopics', methods=['POST'])
+@token_required
 def add_subtopic(report_id, question_id):
     conn = None
     try:
@@ -505,6 +622,7 @@ def add_subtopic(report_id, question_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>/questions/<question_id>/subtopics/<subtopic_id>', methods=['PUT'])
+@token_required
 def update_subtopic(report_id, question_id, subtopic_id):
     conn = None
     try:
@@ -574,6 +692,7 @@ def update_subtopic(report_id, question_id, subtopic_id):
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>/questions/<question_id>', methods=['PUT'])
+@token_required
 def update_question(report_id, question_id):
     conn = None
     try:

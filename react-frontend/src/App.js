@@ -3,21 +3,19 @@ import { io } from "socket.io-client";
 import axios from "axios";
 import jsPDF from "jspdf";
 import styles from './App.module.css';
+import Login from './components/Login';
+import UserProfile from './components/UserProfile';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "http://localhost:8080";
-const socket = io(process.env.REACT_APP_WS_URL || BACKEND_URL, {
-    transports: ['polling', 'websocket'],
-    cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
-    }
-});
-
-// Configure axios defaults
-axios.defaults.headers.common['Content-Type'] = 'application/json';
-axios.defaults.withCredentials = false; // Important for CORS
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8080';
+const WS_URL = process.env.REACT_APP_WS_URL || 'http://localhost:8080';
 
 function App() {
+    // Auth state
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+    const [username, setUsername] = useState('');
+    const [token, setToken] = useState('');
+
+    // App state
     const [view, setView] = useState("create");
     const [reportId, setReportId] = useState(null);
     const [reportNumber, setReportNumber] = useState("");
@@ -45,6 +43,7 @@ function App() {
         pageSize: 'a4',
         orientation: 'portrait'
     });
+    const [socket, setSocket] = useState(null);
 
     // Filter questions based on search term
     const filteredQuestions = questions.filter(q => 
@@ -58,26 +57,82 @@ function App() {
         )
     );
 
-    // Socket.IO event listeners
     useEffect(() => {
-        socket.on("connect", () => {
-            console.log("Connected to server:", BACKEND_URL);
+        // Check for existing auth
+        const storedToken = localStorage.getItem('token');
+        const storedUsername = localStorage.getItem('username');
+        
+        if (storedToken && storedUsername) {
+            setToken(storedToken);
+            setUsername(storedUsername);
+            setIsAuthenticated(true);
+            
+            // Set up axios default header
+            axios.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        }
+    }, []);
+
+    const handleLogin = (data) => {
+        setToken(data.token);
+        setUsername(data.username);
+        setIsAuthenticated(true);
+        
+        // Set up axios default header
+        axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+        
+        // Initialize socket connection after login
+        initializeSocket();
+    };
+
+    const handleLogout = () => {
+        // Clear auth state
+        setToken('');
+        setUsername('');
+        setIsAuthenticated(false);
+        
+        // Clear localStorage
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        
+        // Clear axios header
+        delete axios.defaults.headers.common['Authorization'];
+        
+        // Disconnect socket
+        if (socket) {
+            socket.disconnect();
+        }
+        
+        // Reset view
+        setView('home');
+    };
+
+    // Initialize socket connection with auth token
+    const initializeSocket = () => {
+        const newSocket = io(WS_URL, {
+            auth: {
+                token: `Bearer ${token}`
+            }
+        });
+        
+        // Socket event handlers
+        newSocket.on("connect", () => {
+            console.log("Connected to server:", WS_URL);
         });
 
-        socket.on("connect_error", (error) => {
+        newSocket.on("connect_error", (error) => {
             console.error("Connection error:", error);
         });
 
-        socket.on("error", (error) => {
+        newSocket.on("error", (error) => {
             console.error("Socket error:", error);
         });
 
-        socket.on("question_added", (question) => {
+        newSocket.on("question_added", (question) => {
             console.log("Question added via socket:", question);
             // We'll handle question addition in the createQuestion function
         });
 
-        socket.on("subtopic_added", (data) => {
+        newSocket.on("subtopic_added", (data) => {
             console.log("Subtopic added:", data);
             setQuestions(prevQuestions => {
                 return prevQuestions.map(q => {
@@ -103,7 +158,7 @@ function App() {
             });
         });
 
-        socket.on("subtopic_updated", (data) => {
+        newSocket.on("subtopic_updated", (data) => {
             console.log("Subtopic updated:", data);
             setQuestions(prevQuestions => {
                 return prevQuestions.map(q => {
@@ -135,14 +190,14 @@ function App() {
 
         // Cleanup function to remove event listeners
         return () => {
-            socket.off("connect");
-            socket.off("connect_error");
-            socket.off("error");
-            socket.off("question_added");
-            socket.off("subtopic_added");
-            socket.off("subtopic_updated");
+            newSocket.off("connect");
+            newSocket.off("connect_error");
+            newSocket.off("error");
+            newSocket.off("question_added");
+            newSocket.off("subtopic_added");
+            newSocket.off("subtopic_updated");
         };
-    }, []); // Empty dependency array means this runs once on mount
+    };
 
     // Function to join a room when a lab report is loaded
     const joinRoom = (reportId) => {
@@ -1266,18 +1321,34 @@ function App() {
         );
     }
 
-    switch (view) {
-        case "create":
-            return renderCreateView();
-        case "edit":
-            return renderEditView();
-        case "home":
-            return renderHome();
-        case "question":
-            return renderQuestionView();
-        default:
-            return renderCreateView();
+    if (!isAuthenticated) {
+        return <Login onLogin={handleLogin} />;
     }
-};
+
+    return (
+        <div className={styles.container}>
+            <header className={styles.header}>
+                <h1>Lab Report Manager</h1>
+                <div className={styles.userMenu}>
+                    <button onClick={() => setView("profile")} className={styles.userButton}>
+                        {username}
+                    </button>
+                </div>
+            </header>
+
+            {view === "profile" ? (
+                <UserProfile username={username} onLogout={handleLogout} />
+            ) : (
+                // Your existing app content
+                <div>
+                    {view === "create" && renderCreateView()}
+                    {view === "home" && renderHome()}
+                    {view === "edit" && renderEditView()}
+                    {view === "question" && renderQuestionView()}
+                </div>
+            )}
+        </div>
+    );
+}
 
 export default App;

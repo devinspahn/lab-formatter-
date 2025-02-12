@@ -1,0 +1,52 @@
+.profileContainer {
+    padding: 2rem;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.profileBox {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profileBox h2 {
+    margin-bottom: 1.5rem;
+    color: #333;
+}
+
+.profileInfo {
+    margin-bottom: 2rem;
+}
+
+.infoItem {
+    display: flex;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.infoItem label {
+    font-weight: bold;
+    width: 120px;
+    color: #666;
+}
+
+.infoItem span {
+    color: #333;
+}
+
+.logoutButton {
+    background-color: #dc3545;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.logoutButton:hover {
+    background-color: #c82333;
+}
