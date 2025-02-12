@@ -13,6 +13,10 @@ const socket = io(process.env.REACT_APP_WS_URL || BACKEND_URL, {
     }
 });
 
+// Configure axios defaults
+axios.defaults.headers.common['Content-Type'] = 'application/json';
+axios.defaults.withCredentials = false; // Important for CORS
+
 function App() {
     const [view, setView] = useState("create");
     const [reportId, setReportId] = useState(null);
@@ -176,33 +180,28 @@ function App() {
     };
 
     const createLabReport = async () => {
-        if (!reportNumber || !reportStatement || !reportAuthors) {
-            return alert("Please enter lab number, statement, and authors!");
-        }
-
         try {
-            console.log("Creating lab report...");
+            setIsLoading(true);
+            setError(null);
+            console.log('Creating lab report with URL:', `${BACKEND_URL}/api/lab-reports`);
+            console.log('Payload:', { number: reportNumber, statement: reportStatement, authors: reportAuthors });
+            
             const response = await axios.post(`${BACKEND_URL}/api/lab-reports`, {
                 number: reportNumber,
                 statement: reportStatement,
                 authors: reportAuthors
             });
-
-            console.log("Lab report created:", response.data);
-            const newReportId = response.data.id;
-            setReportId(newReportId);
             
-            // Update URL with report ID
-            const newUrl = `${window.location.pathname}?reportId=${newReportId}`;
-            window.history.pushState({ path: newUrl }, '', newUrl);
-
-            // Join the socket room for this report
-            socket.emit('join', { room: newReportId });
-            
+            console.log('Response:', response.data);
+            setReportId(response.data.id);
             setView("home");
-        } catch (error) {
-            console.error('Error creating lab report:', error.response?.data || error.message);
-            alert('Failed to create lab report. Please try again.');
+            socket.emit('join', { room: response.data.id });
+        } catch (err) {
+            console.error('Error creating lab report:', err);
+            console.error('Error details:', err.response?.data);
+            setError(err.response?.data?.error || 'Failed to create lab report. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
     };
 
