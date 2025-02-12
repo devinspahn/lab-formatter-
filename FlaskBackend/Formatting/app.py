@@ -21,10 +21,14 @@ load_dotenv()
 PORT = int(os.getenv('PORT', 8080))
 DATABASE_URL = os.getenv('DATABASE_URL', 'lab.db')
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', '*')
+ENV = os.getenv('FLASK_ENV', 'production')
 
 app = Flask(__name__)
+app.config['ENV'] = ENV
+app.config['DEBUG'] = ENV == 'development'
+
 CORS(app, resources={r"/api/*": {"origins": CORS_ORIGIN}})
-socketio = SocketIO(app, cors_allowed_origins=CORS_ORIGIN, async_mode='eventlet')
+socketio = SocketIO(app, cors_allowed_origins=CORS_ORIGIN, async_mode='eventlet', logger=True, engineio_logger=True)
 
 # Google Docs API setup
 SCOPES = ['https://www.googleapis.com/auth/documents']
@@ -600,4 +604,8 @@ def handle_leave(data):
 if __name__ == '__main__':
     init_db()  # Initialize database tables
     port = int(os.getenv('PORT', PORT))
-    socketio.run(app, host='0.0.0.0', port=port, debug=False)
+    socketio.run(app, 
+                host='0.0.0.0',
+                port=port,
+                debug=ENV == 'development',
+                use_reloader=ENV == 'development')
