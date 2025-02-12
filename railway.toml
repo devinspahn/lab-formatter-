@@ -1,6 +1,3 @@
 [deploy]
-startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT 'Formatting.app:app'"
-healthcheckPath = "/api/health"
-healthcheckTimeout = 5
-healthcheckInterval = 10
+startCommand = "cd FlaskBackend && gunicorn --worker-class eventlet -w 1 --bind 0.0.0.0:$PORT --timeout 120 --keep-alive 5 --log-level debug 'Formatting.app:app'"
 restartPolicyType = "on_failure"
