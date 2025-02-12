@@ -10,6 +10,15 @@ import subprocess
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Load environment variables
+load_dotenv()
+
+# Database configuration
+DB_DIR = os.path.join(os.getcwd(), 'database')
+os.makedirs(DB_DIR, exist_ok=True)
+DB_PATH = os.path.join(DB_DIR, 'lab_reports.db')
+DATABASE_URL = f'sqlite:///{DB_PATH}'
+
 # Log Python path for debugging
 logger.info(f"Python Path: {sys.path}")
 
@@ -35,11 +44,7 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
-
 # Environment variables
-DATABASE_URL = os.getenv('DATABASE_URL', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'lab.db'))
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
 ENV = os.getenv('FLASK_ENV', 'production')
 JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')  # Change in production
@@ -95,12 +100,27 @@ def token_required(f):
     return decorated
 
 # Database setup
+def dict_factory(cursor, row):
+    """Convert database row to dictionary with datetime handling"""
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        value = row[idx]
+        if isinstance(value, datetime):
+            value = value.isoformat()
+        d[col[0]] = value
+    return d
+
+def get_db():
+    """Get database connection with datetime handling"""
+    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = dict_factory
+    return conn
+
 def init_db():
     """Initialize the database schema"""
-    conn = None
     try:
-        logger.info("[INIT_DB] Starting database initialization")
-        conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
+        logger.info(f"Initializing database at {DB_PATH}")
+        conn = get_db()
         c = conn.cursor()
         
         # Enable foreign keys
@@ -187,25 +207,7 @@ def init_db():
     except Exception as e:
         logger.error(f"[INIT_DB] Error initializing database: {str(e)}")
         logger.exception("[INIT_DB] Full traceback:")
-        if conn:
-            conn.close()
         raise e
-
-def dict_factory(cursor, row):
-    """Convert database row to dictionary with datetime handling"""
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        value = row[idx]
-        if isinstance(value, datetime):
-            value = value.isoformat()
-        d[col[0]] = value
-    return d
-
-def get_db():
-    """Get database connection with datetime handling"""
-    conn = sqlite3.connect(DATABASE_URL, detect_types=sqlite3.PARSE_DECLTYPES)
-    conn.row_factory = dict_factory
-    return conn
 
 # Initialize database at startup
 try:
