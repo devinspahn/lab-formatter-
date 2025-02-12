@@ -250,19 +250,25 @@ function App() {
 
         try {
             setIsLoading(true);
-            console.log("Creating question:", {
-                url: `${BACKEND_URL}/api/lab-reports/${reportId}/questions`,
-                data: {
-                    number: questionNumber,
-                    statement: questionStatement
-                }
-            });
-
-            const response = await axios.post(`${BACKEND_URL}/api/lab-reports/${reportId}/questions`, {
+            const url = `${BACKEND_URL}/api/lab-reports/${reportId}/questions`;
+            const data = JSON.stringify({
                 number: questionNumber,
                 statement: questionStatement
             });
+            
+            console.log("Creating question:", {
+                url,
+                data,
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
 
+            const response = await axios.post(url, data, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
             console.log("Question created successfully:", response.data);
 
             // Add the new question to the list
@@ -282,6 +288,7 @@ function App() {
                 response: error.response?.data,
                 status: error.response?.status,
                 message: error.message,
+                config: error.config,
                 reportId: reportId,
                 questionData: {
                     number: questionNumber,

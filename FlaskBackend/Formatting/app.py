@@ -336,7 +336,7 @@ def add_question(report_id):
         logger.info(f"[ADD QUESTION] Received request for report {report_id}")
         logger.info(f"[ADD QUESTION] Request headers: {dict(request.headers)}")
         logger.info(f"[ADD QUESTION] Request method: {request.method}")
-        logger.info(f"[ADD QUESTION] Raw request data: {request.get_data()}")
+        logger.info(f"[ADD QUESTION] Raw request data: {request.get_data(as_text=True)}")
         
         data = request.get_json()
         logger.info(f"[ADD QUESTION] Parsed request data: {data}")
