@@ -27,15 +27,24 @@ app = Flask(__name__)
 app.config['ENV'] = ENV
 app.config['DEBUG'] = ENV == 'development'
 
-# Allow CORS for all routes
+# Configure CORS
 CORS(app, resources={
     r"/*": {
-        "origins": [CORS_ORIGIN, "http://localhost:3000"],
+        "origins": [CORS_ORIGIN],
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type"]
+        "allow_headers": ["Content-Type"],
+        "supports_credentials": False
     }
 })
-socketio = SocketIO(app, cors_allowed_origins=[CORS_ORIGIN, "http://localhost:3000"], async_mode='eventlet', logger=True, engineio_logger=True)
+
+# Configure Socket.IO
+socketio = SocketIO(
+    app,
+    cors_allowed_origins=[CORS_ORIGIN],
+    async_mode='eventlet',
+    logger=True,
+    engineio_logger=True
+)
 
 # Google Docs API setup
 SCOPES = ['https://www.googleapis.com/auth/documents']
