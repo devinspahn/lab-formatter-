@@ -1334,6 +1334,19 @@ function App() {
             <header className={styles.header}>
                 <h1>Lab Report Manager</h1>
                 <div className={styles.userMenu}>
+                    <button 
+                        onClick={() => {
+                            setView("create");
+                            setReportId(null);
+                            setReportNumber("");
+                            setReportStatement("");
+                            setReportAuthors("");
+                            setQuestions([]);
+                        }} 
+                        className={styles.primaryButton}
+                    >
+                        Create New Report
+                    </button>
                     <button onClick={() => setView("profile")} className={styles.userButton}>
                         {username}
                     </button>
