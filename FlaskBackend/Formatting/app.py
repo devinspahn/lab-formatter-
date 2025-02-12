@@ -5,10 +5,10 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 import os
 import sqlite3
-from dotenv import load_dotenv
 import logging
-import uuid
 from datetime import datetime
+import uuid
+from dotenv import load_dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -45,9 +45,6 @@ socketio = SocketIO(
     logger=True,
     engineio_logger=True
 )
-
-# Initialize database at startup
-init_db()
 
 # Google Docs API setup
 SCOPES = ['https://www.googleapis.com/auth/documents']
@@ -107,6 +104,13 @@ def init_db():
         if conn:
             conn.close()
         raise e
+
+# Initialize database at startup
+try:
+    init_db()
+    logger.info("Database initialized at startup")
+except Exception as e:
+    logger.error(f"Failed to initialize database at startup: {str(e)}")
 
 def dict_factory(cursor, row):
     """Convert database row to dictionary with datetime handling"""
