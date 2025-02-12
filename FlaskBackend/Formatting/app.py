@@ -20,15 +20,22 @@ load_dotenv()
 # Get environment variables or use defaults
 PORT = int(os.getenv('PORT', 8080))
 DATABASE_URL = os.getenv('DATABASE_URL', 'lab.db')
-CORS_ORIGIN = os.getenv('CORS_ORIGIN', '*')
+CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
 ENV = os.getenv('FLASK_ENV', 'production')
 
 app = Flask(__name__)
 app.config['ENV'] = ENV
 app.config['DEBUG'] = ENV == 'development'
 
-CORS(app, resources={r"/api/*": {"origins": CORS_ORIGIN}})
-socketio = SocketIO(app, cors_allowed_origins=CORS_ORIGIN, async_mode='eventlet', logger=True, engineio_logger=True)
+# Allow CORS for all routes
+CORS(app, resources={
+    r"/*": {
+        "origins": [CORS_ORIGIN, "http://localhost:3000"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type"]
+    }
+})
+socketio = SocketIO(app, cors_allowed_origins=[CORS_ORIGIN, "http://localhost:3000"], async_mode='eventlet', logger=True, engineio_logger=True)
 
 # Google Docs API setup
 SCOPES = ['https://www.googleapis.com/auth/documents']
