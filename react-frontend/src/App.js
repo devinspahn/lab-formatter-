@@ -361,6 +361,10 @@ function App() {
             return alert("Please enter a subtopic title!");
         }
 
+        if (!currentQuestion) {
+            return alert("No question selected! Please select or create a question first.");
+        }
+
         try {
             setIsLoading(true);
             console.log("Creating subtopic:", {
@@ -390,6 +394,25 @@ function App() {
 
             console.log("Subtopic created:", response.data);
 
+            // Update the questions array
+            setQuestions(prevQuestions => 
+                prevQuestions.map(q => {
+                    if (q.id === currentQuestion.id) {
+                        return {
+                            ...q,
+                            subtopics: [...(q.subtopics || []), response.data]
+                        };
+                    }
+                    return q;
+                })
+            );
+
+            // Update the current question
+            setCurrentQuestion(prevQuestion => ({
+                ...prevQuestion,
+                subtopics: [...(prevQuestion.subtopics || []), response.data]
+            }));
+
             // Clear the form
             setSubtopicTitle("");
             setProcedures("");
@@ -400,6 +423,7 @@ function App() {
 
         } catch (error) {
             console.error('Error creating subtopic:', error);
+            console.error('Error details:', error.response?.data);
             alert('Failed to create subtopic. Please try again.');
         } finally {
             setIsLoading(false);
