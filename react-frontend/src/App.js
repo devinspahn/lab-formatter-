@@ -32,6 +32,9 @@ function App() {
     const [image, setImage] = useState(null);
     const [figureDescription, setFigureDescription] = useState("");
     const [editingSubtopic, setEditingSubtopic] = useState(null);
+    const [editingQuestion, setEditingQuestion] = useState(null);
+    const [editQuestionNumber, setEditQuestionNumber] = useState("");
+    const [editQuestionStatement, setEditQuestionStatement] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -531,6 +534,58 @@ function App() {
         }
     };
 
+    const updateQuestion = async () => {
+        if (!editingQuestion || !editQuestionNumber || !editQuestionStatement) {
+            return alert("Please fill out all fields!");
+        }
+
+        try {
+            setIsLoading(true);
+            const response = await axios.put(
+                `${BACKEND_URL}/api/lab-reports/${reportId}/questions/${editingQuestion}`,
+                {
+                    number: editQuestionNumber,
+                    statement: editQuestionStatement
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            // Update questions array
+            setQuestions(prevQuestions =>
+                prevQuestions.map(q =>
+                    q.id === editingQuestion
+                        ? { ...q, number: editQuestionNumber, statement: editQuestionStatement }
+                        : q
+                )
+            );
+
+            // Update current question if it's being edited
+            if (currentQuestion?.id === editingQuestion) {
+                setCurrentQuestion(prev => ({
+                    ...prev,
+                    number: editQuestionNumber,
+                    statement: editQuestionStatement
+                }));
+            }
+
+            // Clear edit state
+            setEditingQuestion(null);
+            setEditQuestionNumber("");
+            setEditQuestionStatement("");
+
+        } catch (error) {
+            console.error('Error updating question:', error);
+            alert('Failed to update question. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     // Keyboard shortcuts
     useEffect(() => {
         const handleKeyPress = (e) => {
@@ -541,6 +596,8 @@ function App() {
                     updateSubtopic();
                 } else if (subtopicTitle) {
                     createSubtopic();
+                } else if (editingQuestion) {
+                    updateQuestion();
                 }
             }
             // Esc to cancel edit
@@ -554,12 +611,17 @@ function App() {
                 setCitations("");
                 setImage(null);
                 setFigureDescription("");
+            } else if (e.key === 'Escape' && editingQuestion) {
+                e.preventDefault();
+                setEditingQuestion(null);
+                setEditQuestionNumber("");
+                setEditQuestionStatement("");
             }
         };
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [editingSubtopic, subtopicTitle]);
+    }, [editingSubtopic, subtopicTitle, editingQuestion]);
 
     // Auto-save functionality
     useEffect(() => {
@@ -946,35 +1008,68 @@ function App() {
                 <h2>Created Questions:</h2>
                 {filteredQuestions.map((q, index) => (
                     <div key={q.id} className={styles.questionCard}>
-                        <div className={styles.questionHeader}>
-                            <h3 className={styles.questionTitle}>
-                                Question {q.number}: {q.statement}
-                            </h3>
-                            <div className={styles.buttonGroup}>
+                        {editingQuestion === q.id ? (
+                            <div className={styles.form}>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Question Number:</label>
+                                    <input
+                                        type="text"
+                                        className={styles.input}
+                                        value={editQuestionNumber}
+                                        onChange={(e) => setEditQuestionNumber(e.target.value)}
+                                        placeholder="e.g., 1.1, 2a, etc."
+                                    />
+                                </div>
+                                <div className={styles.formGroup}>
+                                    <label className={styles.label}>Question Statement:</label>
+                                    <textarea
+                                        className={styles.textarea}
+                                        value={editQuestionStatement}
+                                        onChange={(e) => setEditQuestionStatement(e.target.value)}
+                                        placeholder="Enter the question statement..."
+                                    />
+                                </div>
+                                <div className={styles.buttonGroup}>
+                                    <button 
+                                        className={styles.primaryButton}
+                                        onClick={updateQuestion}
+                                        disabled={isLoading}
+                                    >
+                                        {isLoading ? 'Updating...' : 'Update Question'}
+                                    </button>
+                                    <button 
+                                        className={styles.secondaryButton}
+                                        onClick={() => {
+                                            setEditingQuestion(null);
+                                            setEditQuestionNumber("");
+                                            setEditQuestionStatement("");
+                                        }}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className={styles.questionHeader}>
+                                <h3 onClick={() => {
+                                    setCurrentQuestion(q);
+                                    setView("question");
+                                }} style={{ cursor: 'pointer' }}>
+                                    Question {q.number}: {q.statement}
+                                </h3>
                                 <button 
                                     className={styles.secondaryButton}
                                     onClick={() => {
-                                        setCurrentQuestion(q);
-                                        setQuestionNumber(q.number);
-                                        setQuestionStatement(q.statement);
-                                        setView("question");
+                                        setEditingQuestion(q.id);
+                                        setEditQuestionNumber(q.number);
+                                        setEditQuestionStatement(q.statement);
                                     }}
                                 >
                                     Edit Question
                                 </button>
                             </div>
-                        </div>
-                        <div className={styles.subtopicList}>
-                            <p>Subtopics ({q.subtopics.length}):</p>
-                            {q.subtopics.map((s, sIndex) => (
-                                <div key={s.id} className={styles.subtopicCard}>
-                                    <h4 className={styles.subtopicTitle}>{s.title}</h4>
-                                    {s.procedures && <p><strong>Procedures:</strong> {s.procedures}</p>}
-                                    {s.explanation && <p><strong>Explanation:</strong> {s.explanation}</p>}
-                                    {s.citations && <p><strong>Citations:</strong> {s.citations}</p>}
-                                </div>
-                            ))}
-                        </div>
+                        )}
+                        <p>Subtopics: {q.subtopics?.length || 0}</p>
                     </div>
                 ))}
             </div>
