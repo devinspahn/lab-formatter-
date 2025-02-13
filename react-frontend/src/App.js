@@ -61,6 +61,29 @@ function App() {
     );
 
     useEffect(() => {
+        // Clear any stored authentication on app initialization
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        setUsername(null);
+        
+        // Initialize socket connection
+        const socket = io(WS_URL);
+        setSocket(socket);
+
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket server');
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from WebSocket server');
+        });
+
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
+
+    useEffect(() => {
         // Check for existing auth
         const storedToken = localStorage.getItem('token');
         const storedUsername = localStorage.getItem('username');
