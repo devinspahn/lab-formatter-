@@ -52,7 +52,7 @@ function App() {
     const filteredQuestions = questions.filter(q => 
         !searchTerm || 
         q.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        q.statement.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        q.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
         q.subtopics.some(s => 
             s.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
             s.procedures.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -926,7 +926,7 @@ function App() {
                             for (const question of filteredQuestions) {
                                 doc.setFontSize(20);
                                 doc.setFont("times", "bold");
-                                doc.text(`Question ${question.number}: ${question.statement}`, 20, y);
+                                doc.text(`Question ${question.number}: ${question.content}`, 20, y);
                                 y += 12;
 
                                 for (let index = 0; index < question.subtopics.length; index++) {
@@ -1139,14 +1139,14 @@ function App() {
                         ) : (
                             <>
                                 <div className={styles.questionHeader}>
-                                    <h3>Question {q.number}: {q.statement}</h3>
+                                    <h3>Question {q.number}: {q.content}</h3>
                                     <div className={styles.buttonGroup}>
                                         <button 
                                             className={styles.secondaryButton}
                                             onClick={() => {
                                                 setEditingQuestion(q.id);
                                                 setEditQuestionNumber(q.number);
-                                                setEditQuestionStatement(q.statement);
+                                                setEditQuestionStatement(q.content);
                                             }}
                                         >
                                             Edit Question
@@ -1468,7 +1468,7 @@ function App() {
                     for (const question of filteredQuestions) {
                         doc.setFontSize(20);
                         doc.setFont("times", "bold");
-                        doc.text(`Question ${question.number}: ${question.statement}`, 20, y);
+                        doc.text(`Question ${question.number}: ${question.content}`, 20, y);
                         y += 12;
 
                         for (let index = 0; index < question.subtopics.length; index++) {

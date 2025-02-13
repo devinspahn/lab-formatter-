@@ -322,15 +322,20 @@ def add_question(report_id):
         VALUES (?, ?)
         ''', (report_id, data['content']))
         
+        question_id = c.lastrowid
         conn.commit()
         
-        c.execute('SELECT * FROM questions WHERE id = ?', (c.lastrowid,))
+        # Get the created question with all fields
+        c.execute('SELECT * FROM questions WHERE id = ?', (question_id,))
         question = c.fetchone()
         
         conn.close()
         return jsonify(question)
     except Exception as e:
         logger.error(f"Error adding question: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<int:report_id>/questions/<int:question_id>', methods=['PUT'])
