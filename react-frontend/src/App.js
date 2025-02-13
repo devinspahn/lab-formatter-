@@ -109,101 +109,36 @@ function App() {
     // Initialize socket connection with auth token
     const initializeSocket = () => {
         const newSocket = io(WS_URL, {
-            auth: {
-                token: `Bearer ${token}`
-            }
+            auth: { token },
+            transports: ['websocket']
         });
         
-        // Socket event handlers
-        newSocket.on("connect", () => {
-            console.log("Connected to server:", WS_URL);
+        newSocket.on('connect', () => {
+            console.log('Socket connected');
         });
-
-        newSocket.on("connect_error", (error) => {
-            console.error("Connection error:", error);
+        
+        newSocket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
         });
-
-        newSocket.on("error", (error) => {
-            console.error("Socket error:", error);
-        });
-
-        newSocket.on("question_added", (question) => {
-            console.log("Question added via socket:", question);
-            // We'll handle question addition in the createQuestion function
-        });
-
-        newSocket.on("subtopic_added", (data) => {
-            console.log("Subtopic added:", data);
-            setQuestions(prevQuestions => {
-                return prevQuestions.map(q => {
-                    if (q.id === data.question_id) {
-                        return {
-                            ...q,
-                            subtopics: [...q.subtopics, data.subtopic]
-                        };
-                    }
-                    return q;
-                });
-            });
-            
-            // Update currentQuestion if this subtopic belongs to it
-            setCurrentQuestion(prevQuestion => {
-                if (prevQuestion && prevQuestion.id === data.question_id) {
-                    return {
-                        ...prevQuestion,
-                        subtopics: [...prevQuestion.subtopics, data.subtopic]
-                    };
-                }
-                return prevQuestion;
-            });
-        });
-
-        newSocket.on("subtopic_updated", (data) => {
-            console.log("Subtopic updated:", data);
-            setQuestions(prevQuestions => {
-                return prevQuestions.map(q => {
-                    if (q.id === data.question_id) {
-                        return {
-                            ...q,
-                            subtopics: q.subtopics.map(s => 
-                                s.id === data.subtopic.id ? data.subtopic : s
-                            )
-                        };
-                    }
-                    return q;
-                });
-            });
-
-            // Update currentQuestion if this subtopic belongs to it
-            setCurrentQuestion(prevQuestion => {
-                if (prevQuestion && prevQuestion.id === data.question_id) {
-                    return {
-                        ...prevQuestion,
-                        subtopics: prevQuestion.subtopics.map(s =>
-                            s.id === data.subtopic.id ? data.subtopic : s
-                        )
-                    };
-                }
-                return prevQuestion;
-            });
-        });
-
-        // Cleanup function to remove event listeners
-        return () => {
-            newSocket.off("connect");
-            newSocket.off("connect_error");
-            newSocket.off("error");
-            newSocket.off("question_added");
-            newSocket.off("subtopic_added");
-            newSocket.off("subtopic_updated");
-        };
+        
+        setSocket(newSocket);
+        return newSocket;
     };
 
-    // Function to join a room when a lab report is loaded
+    // Initialize socket on component mount if user is authenticated
+    useEffect(() => {
+        if (isAuthenticated && token) {
+            const newSocket = initializeSocket();
+            return () => newSocket.close();
+        }
+    }, [isAuthenticated, token]);
+
     const joinRoom = (reportId) => {
         if (reportId) {
             console.log("Joining room:", reportId);
-            socket.emit('join', { room: reportId });
+            if (socket?.connected) {
+                socket.emit('join', { room: reportId });
+            }
         }
     };
 
@@ -269,8 +204,11 @@ function App() {
             
             if (response.data && response.data.id) {
                 setReportId(response.data.id);
+                // Only emit if socket is connected
+                if (socket?.connected) {
+                    socket.emit('join', { room: response.data.id });
+                }
                 setView("home");
-                socket.emit('join', { room: response.data.id });
             } else {
                 throw new Error('Invalid response from server');
             }
