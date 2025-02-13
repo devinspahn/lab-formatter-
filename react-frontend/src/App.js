@@ -1507,15 +1507,24 @@ function App() {
     return (
         <div className={styles.container}>
             <header className={styles.header}>
-                <h1 className={styles.title}>Lab Report Manager</h1>
-                <div className={styles.buttonGroup}>
+                <h1>Lab Report Manager</h1>
+                <div className={styles.userMenu}>
                     <button 
+                        onClick={() => {
+                            setView("create");
+                            setReportId(null);
+                            setReportNumber("");
+                            setReportStatement("");
+                            setReportAuthors("");
+                            setQuestions([]);
+                        }} 
                         className={styles.primaryButton}
-                        onClick={() => setView("create")}
                     >
                         Create New Report
                     </button>
-                    <span className={styles.badge}>{username || 'admin'}</span>
+                    <button onClick={() => setView("profile")} className={styles.userButton}>
+                        {username}
+                    </button>
                 </div>
             </header>
 
