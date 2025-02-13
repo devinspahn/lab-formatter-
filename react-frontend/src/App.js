@@ -1050,26 +1050,62 @@ function App() {
                                 </div>
                             </div>
                         ) : (
-                            <div className={styles.questionHeader}>
-                                <h3 onClick={() => {
-                                    setCurrentQuestion(q);
-                                    setView("question");
-                                }} style={{ cursor: 'pointer' }}>
-                                    Question {q.number}: {q.statement}
-                                </h3>
-                                <button 
-                                    className={styles.secondaryButton}
-                                    onClick={() => {
-                                        setEditingQuestion(q.id);
-                                        setEditQuestionNumber(q.number);
-                                        setEditQuestionStatement(q.statement);
-                                    }}
-                                >
-                                    Edit Question
-                                </button>
-                            </div>
+                            <>
+                                <div className={styles.questionHeader}>
+                                    <h3>Question {q.number}: {q.statement}</h3>
+                                    <div className={styles.buttonGroup}>
+                                        <button 
+                                            className={styles.secondaryButton}
+                                            onClick={() => {
+                                                setEditingQuestion(q.id);
+                                                setEditQuestionNumber(q.number);
+                                                setEditQuestionStatement(q.statement);
+                                            }}
+                                        >
+                                            Edit Question
+                                        </button>
+                                        <button 
+                                            className={styles.primaryButton}
+                                            onClick={() => {
+                                                setCurrentQuestion(q);
+                                                setView("question");
+                                            }}
+                                        >
+                                            View Details
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className={styles.subtopicList}>
+                                    <h4>Subtopics ({q.subtopics?.length || 0}):</h4>
+                                    {q.subtopics?.map((s, sIndex) => (
+                                        <div key={s.id} className={styles.subtopicCard}>
+                                            <div className={styles.subtopicHeader}>
+                                                <h5>{s.title}</h5>
+                                                <button 
+                                                    className={styles.secondaryButton}
+                                                    onClick={() => {
+                                                        setCurrentQuestion(q);
+                                                        setEditingSubtopic(s.id);
+                                                        setSubtopicTitle(s.title);
+                                                        setProcedures(s.procedures || "");
+                                                        setExplanation(s.explanation || "");
+                                                        setCitations(s.citations || "");
+                                                        setImage(s.image_url || null);
+                                                        setFigureDescription(s.figure_description || "");
+                                                        setView("question");
+                                                    }}
+                                                >
+                                                    Edit Subtopic
+                                                </button>
+                                            </div>
+                                            {s.procedures && <p><strong>Procedures:</strong> {s.procedures}</p>}
+                                            {s.explanation && <p><strong>Explanation:</strong> {s.explanation}</p>}
+                                            {s.citations && <p><strong>Citations:</strong> {s.citations}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </>
                         )}
-                        <p>Subtopics: {q.subtopics?.length || 0}</p>
                     </div>
                 ))}
             </div>
