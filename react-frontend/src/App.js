@@ -98,7 +98,30 @@ function App() {
         }
     }, []);
 
-    const handleLogin = (data) => {
+    const loadSavedLabReports = async () => {
+        try {
+            const response = await axios.get(`${BACKEND_URL}/api/lab-reports`, {
+                headers: {
+                    'Authorization': `Bearer ${localStorage.getItem('token')}`
+                }
+            });
+            
+            if (response.data && response.data.length > 0) {
+                // Load the most recent lab report
+                const mostRecent = response.data[0];
+                setReportId(mostRecent.id);
+                setReportNumber(mostRecent.number);
+                setReportStatement(mostRecent.statement);
+                setReportAuthors(mostRecent.authors);
+                setQuestions(mostRecent.questions || []);
+                setView("home");
+            }
+        } catch (error) {
+            console.error('Error loading saved lab reports:', error);
+        }
+    };
+
+    const handleLogin = async (data) => {
         setToken(data.token);
         setUsername(data.username);
         setIsAuthenticated(true);
@@ -108,7 +131,48 @@ function App() {
         
         // Initialize socket connection after login
         initializeSocket();
+        
+        // Load saved lab reports after successful login
+        await loadSavedLabReports();
     };
+
+    const saveLabReport = async () => {
+        try {
+            const labData = {
+                id: reportId,
+                number: reportNumber,
+                statement: reportStatement,
+                authors: reportAuthors,
+                questions: questions
+            };
+
+            if (reportId) {
+                // Update existing report
+                await axios.put(`${BACKEND_URL}/api/lab-reports/${reportId}`, labData, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+            } else {
+                // Create new report
+                const response = await axios.post(`${BACKEND_URL}/api/lab-reports`, labData, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+                setReportId(response.data.id);
+            }
+        } catch (error) {
+            console.error('Error saving lab report:', error);
+            alert('Failed to save lab report');
+        }
+    };
+
+    useEffect(() => {
+        if (reportId || (reportNumber && reportStatement && reportAuthors)) {
+            saveLabReport();
+        }
+    }, [reportNumber, reportStatement, reportAuthors, questions]);
 
     const handleLogout = () => {
         // Clear auth state

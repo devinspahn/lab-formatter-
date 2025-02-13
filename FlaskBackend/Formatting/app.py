@@ -44,6 +44,7 @@ from flask_socketio import SocketIO, emit, join_room, leave_room
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
 
 # Environment variables
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
@@ -819,6 +820,106 @@ def update_question(report_id, question_id):
         logger.error(f"Error updating question: {str(e)}")
         if conn:
             conn.close()
+        return jsonify({'error': str(e)}), 500
+
+# Add SQLAlchemy for database management
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///lab_reports.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+# Lab Report Model
+class LabReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.String(50), nullable=False)
+    statement = db.Column(db.Text, nullable=False)
+    authors = db.Column(db.String(200), nullable=False)
+    questions = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Create tables
+with app.app_context():
+    db.create_all()
+
+@app.route('/api/lab-reports', methods=['GET'])
+@token_required
+def get_lab_reports():
+    try:
+        reports = LabReport.query.order_by(LabReport.updated_at.desc()).all()
+        return jsonify([{
+            'id': report.id,
+            'number': report.number,
+            'statement': report.statement,
+            'authors': report.authors,
+            'questions': report.questions,
+            'created_at': report.created_at.isoformat(),
+            'updated_at': report.updated_at.isoformat()
+        } for report in reports])
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports', methods=['POST'])
+@token_required
+def create_lab_report_sqlalchemy():
+    try:
+        data = request.get_json()
+        report = LabReport(
+            number=data['number'],
+            statement=data['statement'],
+            authors=data['authors'],
+            questions=data['questions']
+        )
+        db.session.add(report)
+        db.session.commit()
+        return jsonify({
+            'id': report.id,
+            'number': report.number,
+            'statement': report.statement,
+            'authors': report.authors,
+            'questions': report.questions,
+            'created_at': report.created_at.isoformat(),
+            'updated_at': report.updated_at.isoformat()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports/<int:report_id>', methods=['PUT'])
+@token_required
+def update_lab_report_sqlalchemy(report_id):
+    try:
+        report = LabReport.query.get_or_404(report_id)
+        data = request.get_json()
+        
+        report.number = data['number']
+        report.statement = data['statement']
+        report.authors = data['authors']
+        report.questions = data['questions']
+        
+        db.session.commit()
+        return jsonify({
+            'id': report.id,
+            'number': report.number,
+            'statement': report.statement,
+            'authors': report.authors,
+            'questions': report.questions,
+            'created_at': report.created_at.isoformat(),
+            'updated_at': report.updated_at.isoformat()
+        })
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports/<int:report_id>', methods=['DELETE'])
+@token_required
+def delete_lab_report_sqlalchemy(report_id):
+    try:
+        report = LabReport.query.get_or_404(report_id)
+        db.session.delete(report)
+        db.session.commit()
+        return '', 204
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 # Health check endpoint
