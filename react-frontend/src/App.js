@@ -108,17 +108,28 @@ function App() {
 
     // Initialize socket connection with auth token
     const initializeSocket = () => {
+        console.log("Initializing socket with token:", token);
         const newSocket = io(WS_URL, {
-            auth: { token },
-            transports: ['websocket']
+            auth: {
+                token: `Bearer ${token}`  // Add Bearer prefix
+            },
+            transports: ['websocket'],
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            reconnectionAttempts: 5
         });
         
         newSocket.on('connect', () => {
-            console.log('Socket connected');
+            console.log('Socket connected successfully');
         });
         
         newSocket.on('connect_error', (error) => {
             console.error('Socket connection error:', error);
+        });
+
+        newSocket.on('error', (error) => {
+            console.error('Socket error:', error);
         });
         
         setSocket(newSocket);
@@ -435,6 +446,10 @@ function App() {
             return alert("Please enter a subtopic title!");
         }
 
+        if (!currentQuestion) {
+            return alert("No question selected! Please select or create a question first.");
+        }
+
         try {
             setIsLoading(true);
             console.log("Updating subtopic:", {
@@ -460,10 +475,39 @@ function App() {
                     citations,
                     image_url: image,
                     figure_description: figureDescription
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 }
             );
 
             console.log("Subtopic updated successfully:", response.data);
+
+            // Update the questions array
+            setQuestions(prevQuestions => 
+                prevQuestions.map(q => {
+                    if (q.id === currentQuestion.id) {
+                        return {
+                            ...q,
+                            subtopics: q.subtopics.map(s => 
+                                s.id === editingSubtopic ? response.data : s
+                            )
+                        };
+                    }
+                    return q;
+                })
+            );
+
+            // Update the current question
+            setCurrentQuestion(prevQuestion => ({
+                ...prevQuestion,
+                subtopics: prevQuestion.subtopics.map(s =>
+                    s.id === editingSubtopic ? response.data : s
+                )
+            }));
 
             // Clear the form
             setSubtopicTitle("");
