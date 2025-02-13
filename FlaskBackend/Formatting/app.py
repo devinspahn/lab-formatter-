@@ -65,6 +65,7 @@ def init_db():
         c = conn.cursor()
         
         # Create users table
+        logger.info("[INIT_DB] Creating users table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,7 +75,21 @@ def init_db():
         )
         ''')
         
+        # Create admin user if not exists
+        logger.info("[INIT_DB] Checking for admin user")
+        c.execute('SELECT username FROM users WHERE username = ?', ('admin',))
+        admin_exists = c.fetchone()
+        
+        if not admin_exists:
+            logger.info("[INIT_DB] Creating admin user")
+            admin_password = generate_password_hash('admin123')
+            c.execute('INSERT INTO users (username, password) VALUES (?, ?)', ('admin', admin_password))
+            logger.info("[INIT_DB] Admin user created successfully")
+        else:
+            logger.info("[INIT_DB] Admin user already exists")
+        
         # Create lab_reports table
+        logger.info("[INIT_DB] Creating lab_reports table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS lab_reports (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,6 +102,7 @@ def init_db():
         ''')
         
         # Create questions table
+        logger.info("[INIT_DB] Creating questions table")
         c.execute('''
         CREATE TABLE IF NOT EXISTS questions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -98,8 +114,18 @@ def init_db():
         ''')
         
         conn.commit()
-        conn.close()
         logger.info("Database initialized successfully")
+        
+        # Verify admin user
+        c.execute('SELECT username FROM users WHERE username = ?', ('admin',))
+        admin_user = c.fetchone()
+        if admin_user:
+            logger.info("[INIT_DB] Verified admin user exists")
+            logger.info(f"[INIT_DB] Admin username: {admin_user['username']}")
+        else:
+            logger.error("[INIT_DB] Failed to verify admin user")
+        
+        conn.close()
     except Exception as e:
         logger.error(f"Error initializing database: {str(e)}")
         raise
