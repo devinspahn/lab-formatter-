@@ -123,6 +123,8 @@ def init_db():
             procedures TEXT,
             explanation TEXT,
             citations TEXT,
+            image_url TEXT,
+            figure_description TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (question_id) REFERENCES questions (id)
         )
@@ -436,9 +438,10 @@ def add_subtopic(report_id, question_id):
         
         # Create subtopic
         c.execute('''
-        INSERT INTO subtopics (question_id, title, procedures, explanation, citations)
-        VALUES (?, ?, ?, ?, ?)
-        ''', (question_id, data['title'], data.get('procedures', ''), data.get('explanation', ''), data.get('citations', '')))
+        INSERT INTO subtopics (question_id, title, procedures, explanation, citations, image_url, figure_description)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (question_id, data['title'], data.get('procedures', ''), data.get('explanation', ''), 
+              data.get('citations', ''), data.get('image_url', ''), data.get('figure_description', '')))
         
         subtopic_id = c.lastrowid
         conn.commit()
@@ -479,9 +482,10 @@ def update_subtopic(report_id, question_id, subtopic_id):
         # Update subtopic
         c.execute('''
         UPDATE subtopics 
-        SET title = ?, procedures = ?, explanation = ?, citations = ?
+        SET title = ?, procedures = ?, explanation = ?, citations = ?, image_url = ?, figure_description = ?
         WHERE id = ?
-        ''', (data['title'], data.get('procedures', ''), data.get('explanation', ''), data.get('citations', ''), subtopic_id))
+        ''', (data['title'], data.get('procedures', ''), data.get('explanation', ''), 
+              data.get('citations', ''), data.get('image_url', ''), data.get('figure_description', ''), subtopic_id))
         
         conn.commit()
         

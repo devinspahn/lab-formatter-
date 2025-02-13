@@ -495,6 +495,12 @@ function App() {
                     citations,
                     image_url: image,
                     figure_description: figureDescription
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 }
             );
 
