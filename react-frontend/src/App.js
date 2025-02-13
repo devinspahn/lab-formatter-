@@ -427,17 +427,24 @@ function App() {
             });
             console.log("Question created successfully:", response.data);
 
+            // Initialize the question with empty subtopics array
+            const newQuestion = {
+                ...response.data,
+                number: questionNumber,
+                subtopics: []
+            };
+
             // Add the new question to the list
-            setQuestions(prevQuestions => [...prevQuestions, response.data]);
+            setQuestions(prevQuestions => [...prevQuestions, newQuestion]);
             
             // Clear the form
             setQuestionNumber("");
             setQuestionStatement("");
 
             // Set the current question and navigate to question view
-            setCurrentQuestion(response.data);
+            setCurrentQuestion(newQuestion);
             setView("question");
-            
+            setIsLoading(false);
         } catch (error) {
             console.error('Error creating question:', {
                 error: error,
@@ -452,8 +459,6 @@ function App() {
                 }
             });
             alert('Failed to create question. Please try again.');
-        } finally {
-            setIsLoading(false);
         }
     };
 
