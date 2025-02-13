@@ -409,7 +409,7 @@ function App() {
             const url = `${BACKEND_URL}/api/lab-reports/${reportId}/questions`;
             const data = JSON.stringify({
                 number: questionNumber,
-                statement: questionStatement
+                content: questionStatement
             });
             
             console.log("Creating question:", {
@@ -448,7 +448,7 @@ function App() {
                 reportId: reportId,
                 questionData: {
                     number: questionNumber,
-                    statement: questionStatement
+                    content: questionStatement
                 }
             });
             alert('Failed to create question. Please try again.');
@@ -632,7 +632,7 @@ function App() {
                 `${BACKEND_URL}/api/lab-reports/${reportId}/questions/${editingQuestion}`,
                 {
                     number: editQuestionNumber,
-                    statement: editQuestionStatement
+                    content: editQuestionStatement
                 },
                 {
                     headers: {
@@ -646,7 +646,7 @@ function App() {
             setQuestions(prevQuestions =>
                 prevQuestions.map(q =>
                     q.id === editingQuestion
-                        ? { ...q, number: editQuestionNumber, statement: editQuestionStatement }
+                        ? { ...q, number: editQuestionNumber, content: editQuestionStatement }
                         : q
                 )
             );
@@ -656,7 +656,7 @@ function App() {
                 setCurrentQuestion(prev => ({
                     ...prev,
                     number: editQuestionNumber,
-                    statement: editQuestionStatement
+                    content: editQuestionStatement
                 }));
             }
 
