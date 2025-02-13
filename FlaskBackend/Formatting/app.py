@@ -113,6 +113,21 @@ def init_db():
         )
         ''')
         
+        # Create subtopics table
+        logger.info("[INIT_DB] Creating subtopics table")
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS subtopics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            question_id INTEGER,
+            title TEXT NOT NULL,
+            procedures TEXT,
+            explanation TEXT,
+            citations TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (question_id) REFERENCES questions (id)
+        )
+        ''')
+        
         conn.commit()
         logger.info("Database initialized successfully")
         
@@ -234,8 +249,15 @@ def get_lab_report(report_id):
             conn.close()
             return jsonify({'error': 'Lab report not found'}), 404
         
+        # Get questions with their subtopics
         c.execute('SELECT * FROM questions WHERE lab_report_id = ?', (report_id,))
-        report['questions'] = c.fetchall()
+        questions = c.fetchall()
+        
+        for question in questions:
+            c.execute('SELECT * FROM subtopics WHERE question_id = ?', (question['id'],))
+            question['subtopics'] = c.fetchall()
+        
+        report['questions'] = questions
         
         conn.close()
         return jsonify(report)
@@ -391,6 +413,121 @@ def delete_question(report_id, question_id):
         return jsonify({'message': 'Question deleted successfully'})
     except Exception as e:
         logger.error(f"Error deleting question: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports/<int:report_id>/questions/<int:question_id>/subtopics', methods=['POST'])
+@token_required
+def add_subtopic(report_id, question_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        # Verify question exists and belongs to report
+        c.execute('''
+        SELECT * FROM questions 
+        WHERE id = ? AND lab_report_id = ?
+        ''', (question_id, report_id))
+        question = c.fetchone()
+        
+        if not question:
+            conn.close()
+            return jsonify({'error': 'Question not found'}), 404
+        
+        # Create subtopic
+        c.execute('''
+        INSERT INTO subtopics (question_id, title, procedures, explanation, citations)
+        VALUES (?, ?, ?, ?, ?)
+        ''', (question_id, data['title'], data.get('procedures', ''), data.get('explanation', ''), data.get('citations', '')))
+        
+        subtopic_id = c.lastrowid
+        conn.commit()
+        
+        # Get created subtopic
+        c.execute('SELECT * FROM subtopics WHERE id = ?', (subtopic_id,))
+        subtopic = c.fetchone()
+        
+        conn.close()
+        return jsonify(subtopic)
+    except Exception as e:
+        logger.error(f"Error adding subtopic: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports/<int:report_id>/questions/<int:question_id>/subtopics/<int:subtopic_id>', methods=['PUT'])
+@token_required
+def update_subtopic(report_id, question_id, subtopic_id):
+    try:
+        data = request.get_json()
+        conn = get_db()
+        c = conn.cursor()
+        
+        # Verify subtopic exists and belongs to question
+        c.execute('''
+        SELECT s.* FROM subtopics s
+        JOIN questions q ON s.question_id = q.id
+        WHERE s.id = ? AND q.id = ? AND q.lab_report_id = ?
+        ''', (subtopic_id, question_id, report_id))
+        subtopic = c.fetchone()
+        
+        if not subtopic:
+            conn.close()
+            return jsonify({'error': 'Subtopic not found'}), 404
+        
+        # Update subtopic
+        c.execute('''
+        UPDATE subtopics 
+        SET title = ?, procedures = ?, explanation = ?, citations = ?
+        WHERE id = ?
+        ''', (data['title'], data.get('procedures', ''), data.get('explanation', ''), data.get('citations', ''), subtopic_id))
+        
+        conn.commit()
+        
+        # Get updated subtopic
+        c.execute('SELECT * FROM subtopics WHERE id = ?', (subtopic_id,))
+        subtopic = c.fetchone()
+        
+        conn.close()
+        return jsonify(subtopic)
+    except Exception as e:
+        logger.error(f"Error updating subtopic: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/lab-reports/<int:report_id>/questions/<int:question_id>/subtopics/<int:subtopic_id>', methods=['DELETE'])
+@token_required
+def delete_subtopic(report_id, question_id, subtopic_id):
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        
+        # Verify subtopic exists and belongs to question
+        c.execute('''
+        SELECT s.* FROM subtopics s
+        JOIN questions q ON s.question_id = q.id
+        WHERE s.id = ? AND q.id = ? AND q.lab_report_id = ?
+        ''', (subtopic_id, question_id, report_id))
+        subtopic = c.fetchone()
+        
+        if not subtopic:
+            conn.close()
+            return jsonify({'error': 'Subtopic not found'}), 404
+        
+        # Delete subtopic
+        c.execute('DELETE FROM subtopics WHERE id = ?', (subtopic_id,))
+        conn.commit()
+        
+        conn.close()
+        return jsonify({'message': 'Subtopic deleted successfully'})
+    except Exception as e:
+        logger.error(f"Error deleting subtopic: {str(e)}")
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
         return jsonify({'error': str(e)}), 500
 
 # Authentication routes
