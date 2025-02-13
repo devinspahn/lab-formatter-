@@ -236,6 +236,12 @@ function App() {
 
     const createLabReport = async () => {
         try {
+            // Validate required fields
+            if (!reportNumber || !reportStatement || !reportAuthors) {
+                setError('Please fill out all required fields: Lab Number, Lab Statement, and Authors');
+                return;
+            }
+            
             setIsLoading(true);
             setError(null);
             console.log('Creating lab report with URL:', `${BACKEND_URL}/api/lab-reports`);
@@ -247,7 +253,8 @@ function App() {
                 authors: reportAuthors
             }, {
                 headers: {
-                    'Authorization': `Bearer ${token}`
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
                 }
             });
             
@@ -652,6 +659,12 @@ function App() {
                 <h1 className={styles.title}>Create New Lab Report</h1>
             </header>
 
+            {error && (
+                <div className={styles.errorMessage}>
+                    {error}
+                </div>
+            )}
+
             <div className={styles.form}>
                 <div className={styles.formGroup}>
                     <label className={styles.label}>Lab Number:</label>
@@ -661,6 +674,7 @@ function App() {
                         value={reportNumber}
                         onChange={(e) => setReportNumber(e.target.value)}
                         placeholder="e.g., 1, 2, etc."
+                        required
                     />
                 </div>
 
@@ -671,6 +685,7 @@ function App() {
                         value={reportStatement}
                         onChange={(e) => setReportStatement(e.target.value)}
                         placeholder="e.g., Access Control"
+                        required
                     />
                 </div>
 
@@ -682,14 +697,16 @@ function App() {
                         value={reportAuthors}
                         onChange={(e) => setReportAuthors(e.target.value)}
                         placeholder="e.g., John Doe, Jane Smith"
+                        required
                     />
                 </div>
 
                 <button 
                     className={styles.primaryButton}
                     onClick={createLabReport}
+                    disabled={isLoading}
                 >
-                    Create Lab Report
+                    {isLoading ? 'Creating...' : 'Create Lab Report'}
                 </button>
             </div>
         </div>
