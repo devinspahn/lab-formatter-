@@ -1,10 +1,19 @@
 import os
+import sys
 import uuid
+import json
 import sqlite3
 import logging
-from datetime import datetime, timedelta
-import sys
 import subprocess
+from datetime import datetime, timedelta
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+from flask import Flask, request, jsonify, send_file
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask_sqlalchemy import SQLAlchemy
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
 from dotenv import load_dotenv
 
 # Configure logging
@@ -14,90 +23,74 @@ logger = logging.getLogger(__name__)
 # Load environment variables
 load_dotenv()
 
-# Database configuration
-DB_DIR = os.path.join(os.getcwd(), 'database')
-os.makedirs(DB_DIR, exist_ok=True)
-DB_PATH = os.path.join(DB_DIR, 'lab_reports.db')
-DATABASE_URL = f'sqlite:///{DB_PATH}'
-
-# Log Python path for debugging
-logger.info(f"Python Path: {sys.path}")
-
-# Try to install PyJWT if not found
-try:
-    import jwt
-except ImportError:
-    logger.error("JWT not found, attempting to install PyJWT...")
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT==2.10.1"])
-        import jwt
-        logger.info("Successfully installed PyJWT")
-    except Exception as e:
-        logger.error(f"Failed to install PyJWT: {str(e)}")
-        raise
-
-from functools import wraps
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from flask_socketio import SocketIO, emit, join_room, leave_room
-from google.oauth2 import service_account
-from googleapiclient.discovery import build
-from dotenv import load_dotenv
-from flask_sqlalchemy import SQLAlchemy
-
 # Environment variables
 CORS_ORIGIN = os.getenv('CORS_ORIGIN', 'https://lab-formatter.vercel.app')
 ENV = os.getenv('FLASK_ENV', 'production')
-JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')  # Change in production
+JWT_SECRET = os.getenv('JWT_SECRET', 'your-secret-key')
 PORT = int(os.getenv('PORT', 8080))
 
 # Initialize Flask app
 app = Flask(__name__)
-app.config['ENV'] = ENV
-app.config['DEBUG'] = ENV == 'development'
-app.config['JWT_SECRET'] = JWT_SECRET
 
-# Configure CORS
-CORS(app, resources={
-    r"/*": {
-        "origins": [CORS_ORIGIN],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization"],
-        "supports_credentials": True
-    }
-})
-
-# Configure Socket.IO
-socketio = SocketIO(
-    app,
-    cors_allowed_origins=[CORS_ORIGIN],
-    async_mode='eventlet',
-    logger=True,
-    engineio_logger=True
+# Configure app
+app.config.update(
+    ENV=ENV,
+    DEBUG=ENV == 'development',
+    JWT_SECRET=JWT_SECRET,
+    SQLALCHEMY_DATABASE_URI='sqlite:///lab_reports.db',
+    SQLALCHEMY_TRACK_MODIFICATIONS=False
 )
 
-# Google Docs API setup
-SCOPES = ['https://www.googleapis.com/auth/documents']
-SERVICE_ACCOUNT_FILE = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE', 'service_account.json')
+# Initialize extensions
+db = SQLAlchemy(app)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Token required decorator
+# Install required packages if needed
+try:
+    import jwt
+except ImportError:
+    try:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "PyJWT"])
+        import jwt
+    except Exception as e:
+        logger.error(f"Failed to install PyJWT: {str(e)}")
+        raise
+
+# Models
+class LabReport(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    number = db.Column(db.String(50), nullable=False)
+    statement = db.Column(db.Text, nullable=False)
+    authors = db.Column(db.String(200), nullable=False)
+    questions = db.Column(db.JSON)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+# Create database tables
+with app.app_context():
+    db.create_all()
+
+# Decorators
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
         if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].replace('Bearer ', '')
-        
+            auth_header = request.headers['Authorization']
+            try:
+                token = auth_header.split(" ")[1]
+            except IndexError:
+                return jsonify({'error': 'Token is missing'}), 401
+
         if not token:
             return jsonify({'error': 'Token is missing'}), 401
-            
+
         try:
-            data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
-            current_user = data['username']
-        except:
+            jwt.decode(token, JWT_SECRET, algorithms=['HS256'])
+        except jwt.InvalidTokenError:
             return jsonify({'error': 'Token is invalid'}), 401
-            
+
         return f(*args, **kwargs)
     return decorated
 
@@ -114,14 +107,14 @@ def dict_factory(cursor, row):
 
 def get_db():
     """Get database connection with datetime handling"""
-    conn = sqlite3.connect(DB_PATH, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn = sqlite3.connect('lab_reports.db', detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = dict_factory
     return conn
 
 def init_db():
     """Initialize the database schema"""
     try:
-        logger.info(f"Initializing database at {DB_PATH}")
+        logger.info(f"Initializing database at lab_reports.db")
         conn = get_db()
         c = conn.cursor()
         
@@ -255,7 +248,7 @@ def login():
             token = jwt.encode({
                 'username': user['username'],
                 'exp': datetime.utcnow() + timedelta(days=1)
-            }, app.config['JWT_SECRET'], algorithm="HS256")
+            }, JWT_SECRET, algorithm="HS256")
             
             return jsonify({
                 'token': token,
@@ -275,7 +268,7 @@ def login():
 def get_profile():
     try:
         token = request.headers['Authorization'].replace('Bearer ', '')
-        data = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+        data = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
         
         conn = get_db()
         c = conn.cursor()
@@ -327,7 +320,7 @@ def create_lab_report():
         # Get user from token
         token = request.headers.get('Authorization', '').replace('Bearer ', '')
         try:
-            data_token = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+            data_token = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
             current_user = data_token['username']
             logger.info(f"Authenticated user: {current_user}")
         except jwt.InvalidTokenError as e:
@@ -463,28 +456,35 @@ def update_lab_report(report_id):
             
             # Get the updated report
             c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
-            report = dict(c.fetchone())
-            
-            # Get questions
-            c.execute('SELECT * FROM questions WHERE lab_report_id = ? ORDER BY created_at', (report_id,))
-            questions = [dict(q) for q in c.fetchall()]
-            
-            # Get subtopics for each question
-            for q in questions:
-                c.execute('SELECT * FROM subtopics WHERE question_id = ? ORDER BY created_at', (q['id'],))
-                q['subtopics'] = [dict(s) for s in c.fetchall()]
+            report = c.fetchone()
+            if report:
+                report = dict(report)
                 
-            report['questions'] = questions
-            
-            conn.close()
-            
-            # Emit socket event
-            logger.info(f"[UPDATE LAB] Emitting lab_report_updated event for {report_id}")
-            socketio.emit('lab_report_updated', report, room=report_id)
-            
-            logger.info(f"[UPDATE LAB] Returning updated report: {report}")
-            return jsonify(report), 200
-            
+                # Get questions
+                c.execute('SELECT * FROM questions WHERE lab_report_id = ? ORDER BY created_at', (report_id,))
+                questions = [dict(q) for q in c.fetchall()]
+                
+                # Get subtopics for each question
+                for q in questions:
+                    c.execute('SELECT * FROM subtopics WHERE question_id = ? ORDER BY created_at', (q['id'],))
+                    q['subtopics'] = [dict(s) for s in c.fetchall()]
+                    
+                report['questions'] = questions
+                
+                conn.close()
+                
+                # Emit socket event
+                logger.info(f"[UPDATE LAB] Emitting lab_report_updated event for {report_id}")
+                socketio.emit('lab_report_updated', report, room=report_id)
+                
+                logger.info(f"[UPDATE LAB] Returning updated report: {report}")
+                return jsonify(report), 200
+                
+            else:
+                logger.error(f"[UPDATE LAB] Failed to retrieve updated report {report_id}")
+                conn.close()
+                return jsonify({'error': 'Failed to update report'}), 500
+                
         except sqlite3.Error as e:
             logger.error(f"[UPDATE LAB] Database error while updating: {str(e)}")
             conn.rollback()
@@ -822,25 +822,7 @@ def update_question(report_id, question_id):
             conn.close()
         return jsonify({'error': str(e)}), 500
 
-# Add SQLAlchemy for database management
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///lab_reports.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-# Lab Report Model
-class LabReport(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    number = db.Column(db.String(50), nullable=False)
-    statement = db.Column(db.Text, nullable=False)
-    authors = db.Column(db.String(200), nullable=False)
-    questions = db.Column(db.JSON)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-# Create tables
-with app.app_context():
-    db.create_all()
-
+# Lab Report endpoints
 @app.route('/api/lab-reports', methods=['GET'])
 @token_required
 def get_lab_reports():
@@ -856,6 +838,7 @@ def get_lab_reports():
             'updated_at': report.updated_at.isoformat()
         } for report in reports])
     except Exception as e:
+        logger.error(f"Error getting lab reports: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports', methods=['POST'])
@@ -867,10 +850,11 @@ def create_lab_report_sqlalchemy():
             number=data['number'],
             statement=data['statement'],
             authors=data['authors'],
-            questions=data['questions']
+            questions=data.get('questions', [])
         )
         db.session.add(report)
         db.session.commit()
+        
         return jsonify({
             'id': report.id,
             'number': report.number,
@@ -882,6 +866,7 @@ def create_lab_report_sqlalchemy():
         })
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error creating lab report: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<int:report_id>', methods=['PUT'])
@@ -891,12 +876,13 @@ def update_lab_report_sqlalchemy(report_id):
         report = LabReport.query.get_or_404(report_id)
         data = request.get_json()
         
-        report.number = data['number']
-        report.statement = data['statement']
-        report.authors = data['authors']
-        report.questions = data['questions']
+        report.number = data.get('number', report.number)
+        report.statement = data.get('statement', report.statement)
+        report.authors = data.get('authors', report.authors)
+        report.questions = data.get('questions', report.questions)
         
         db.session.commit()
+        
         return jsonify({
             'id': report.id,
             'number': report.number,
@@ -908,6 +894,7 @@ def update_lab_report_sqlalchemy(report_id):
         })
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error updating lab report {report_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<int:report_id>', methods=['DELETE'])
@@ -920,6 +907,7 @@ def delete_lab_report_sqlalchemy(report_id):
         return '', 204
     except Exception as e:
         db.session.rollback()
+        logger.error(f"Error deleting lab report {report_id}: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 # Health check endpoint
