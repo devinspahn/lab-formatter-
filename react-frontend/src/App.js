@@ -244,14 +244,21 @@ function App() {
             
             setIsLoading(true);
             setError(null);
+
+            // Prepare request data
+            const requestData = {
+                number: reportNumber.trim(),
+                statement: reportStatement.trim(),
+                authors: reportAuthors.trim()
+            };
+
             console.log('Creating lab report with URL:', `${BACKEND_URL}/api/lab-reports`);
-            console.log('Payload:', { number: reportNumber, statement: reportStatement, authors: reportAuthors });
+            console.log('Request data:', requestData);
             
-            const response = await axios.post(`${BACKEND_URL}/api/lab-reports`, {
-                number: reportNumber,
-                statement: reportStatement,
-                authors: reportAuthors
-            }, {
+            const response = await axios({
+                method: 'post',
+                url: `${BACKEND_URL}/api/lab-reports`,
+                data: requestData,
                 headers: {
                     'Authorization': `Bearer ${token}`,
                     'Content-Type': 'application/json'
@@ -259,13 +266,27 @@ function App() {
             });
             
             console.log('Response:', response.data);
-            setReportId(response.data.id);
-            setView("home");
-            socket.emit('join', { room: response.data.id });
+            
+            if (response.data && response.data.id) {
+                setReportId(response.data.id);
+                setView("home");
+                socket.emit('join', { room: response.data.id });
+            } else {
+                throw new Error('Invalid response from server');
+            }
         } catch (err) {
             console.error('Error creating lab report:', err);
+            console.error('Error response:', err.response);
             console.error('Error details:', err.response?.data);
-            setError(err.response?.data?.error || 'Failed to create lab report. Please try again.');
+            
+            let errorMessage = 'Failed to create lab report. Please try again.';
+            if (err.response?.data?.error) {
+                errorMessage = err.response.data.error;
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

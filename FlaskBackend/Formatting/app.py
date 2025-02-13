@@ -300,63 +300,77 @@ def get_profile():
 def create_lab_report():
     conn = None
     try:
-        data = request.json
+        # Log request headers and data
+        logger.info(f"Headers received: {dict(request.headers)}")
+        logger.info(f"Request data: {request.get_data()}")
+        
+        data = request.get_json()
+        logger.info(f"Parsed JSON data: {data}")
+        
         if not data:
+            logger.error("No JSON data received in request")
             return jsonify({'error': 'No data provided'}), 400
             
-        if 'number' not in data or 'statement' not in data or 'authors' not in data:
-            return jsonify({'error': 'Missing required fields'}), 400
+        required_fields = ['number', 'statement', 'authors']
+        missing_fields = [field for field in required_fields if field not in data]
+        if missing_fields:
+            logger.error(f"Missing required fields: {missing_fields}")
+            return jsonify({'error': f'Missing required fields: {", ".join(missing_fields)}'}), 400
             
         report_id = str(uuid.uuid4())
+        logger.info(f"Generated report ID: {report_id}")
         
         conn = get_db()
         c = conn.cursor()
         
-        # Create the table if it doesn't exist
-        c.execute('''
-            CREATE TABLE IF NOT EXISTS lab_reports (
-                id TEXT PRIMARY KEY,
-                number TEXT NOT NULL,
-                statement TEXT NOT NULL,
-                authors TEXT NOT NULL,
-                created_by TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (created_by) REFERENCES users (username)
+        # Get user from token
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        try:
+            data_token = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
+            current_user = data_token['username']
+            logger.info(f"Authenticated user: {current_user}")
+        except jwt.InvalidTokenError as e:
+            logger.error(f"Invalid token: {str(e)}")
+            return jsonify({'error': 'Invalid authentication token'}), 401
+        
+        # Insert the report
+        try:
+            logger.info("Attempting to insert report into database")
+            c.execute(
+                'INSERT INTO lab_reports (id, number, statement, authors, created_by) VALUES (?, ?, ?, ?, ?)',
+                (report_id, data['number'], data['statement'], data['authors'], current_user)
             )
-        ''')
-        
-        token = request.headers['Authorization'].replace('Bearer ', '')
-        data_token = jwt.decode(token, app.config['JWT_SECRET'], algorithms=["HS256"])
-        current_user = data_token['username']
-        
-        c.execute(
-            'INSERT INTO lab_reports (id, number, statement, authors, created_by) VALUES (?, ?, ?, ?, ?)',
-            (report_id, data['number'], data['statement'], data['authors'], current_user)
-        )
-        conn.commit()
+            conn.commit()
+            logger.info("Successfully inserted report into database")
+        except sqlite3.Error as e:
+            logger.error(f"Database insertion error: {str(e)}")
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
         
         # Get the created report
-        c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
-        row = c.fetchone()
-        if row:
-            report = dict(row)
-            report['questions'] = []
-            conn.close()
-            return jsonify(report), 201
-        else:
-            conn.close()
-            return jsonify({'error': 'Failed to create report'}), 500
+        try:
+            c.execute('SELECT * FROM lab_reports WHERE id = ?', (report_id,))
+            row = c.fetchone()
+            if row:
+                report = dict(row)
+                report['questions'] = []
+                logger.info(f"Successfully retrieved created report: {report}")
+                return jsonify(report), 201
+            else:
+                logger.error("Failed to retrieve created report")
+                return jsonify({'error': 'Failed to create report'}), 500
+        except sqlite3.Error as e:
+            logger.error(f"Error retrieving created report: {str(e)}")
+            return jsonify({'error': f'Database error: {str(e)}'}), 500
             
     except sqlite3.Error as e:
         logger.error(f"Database error: {str(e)}")
-        if conn:
-            conn.close()
         return jsonify({'error': f'Database error: {str(e)}'}), 500
     except Exception as e:
-        logger.error(f"Error creating lab report: {str(e)}")
+        logger.error(f"Unexpected error creating lab report: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    finally:
         if conn:
             conn.close()
-        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/lab-reports/<report_id>', methods=['GET'])
 @token_required
@@ -411,6 +425,8 @@ def update_lab_report(report_id):
         logger.info(f"[UPDATE LAB] Raw request data: {request.get_data(as_text=True)}")
         
         data = request.get_json()
+        logger.info(f"[UPDATE LAB] Parsed request data: {data}")
+        
         if not data:
             logger.error("[UPDATE LAB] No data provided in request")
             return jsonify({'error': 'No data provided'}), 400
