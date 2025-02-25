@@ -967,6 +967,12 @@ function App() {
                             let y = 20;
                             
                             for (const question of filteredQuestions) {
+                                // Check if we need a new page for the question
+                                if (y > 250) {  // Leave some margin at bottom of page
+                                    doc.addPage();
+                                    y = 20;  // Reset y position for new page
+                                }
+
                                 doc.setFontSize(20);
                                 doc.setFont("times", "bold");
                                 doc.text(`Question ${question.number}: ${question.content}`, 20, y);
@@ -976,10 +982,23 @@ function App() {
                                     const subtopic = question.subtopics[index];
                                     const subtopicLabel = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")[index] || `(${index + 1})`; // A, B, C... fallback to numbers if needed
 
+                                    // Check if we need a new page for the subtopic
+                                    if (y > 250) {  // Leave some margin at bottom of page
+                                        doc.addPage();
+                                        y = 20;  // Reset y position for new page
+                                    }
+
                                     doc.setFontSize(16);
                                     doc.setFont("times", "bolditalic");
                                     doc.text(`${subtopicLabel}. ${subtopic.title}`, 20, y, { underline: true });
                                     y += 10;
+
+                                    // Check space needed for procedures
+                                    const proceduresLines = doc.splitTextToSize(subtopic.procedures || "", 160).length;
+                                    if (y + proceduresLines * 5 + 20 > 270) {  // Check if procedures will fit
+                                        doc.addPage();
+                                        y = 20;
+                                    }
 
                                     // First show procedures
                                     doc.setFontSize(12);
@@ -988,11 +1007,17 @@ function App() {
                                     y += 6;
                                     doc.setFont("times", "normal");
                                     doc.text(subtopic.procedures || "None", 20, y, { maxWidth: 160 });
-                                    y += doc.splitTextToSize(subtopic.procedures || "", 160).length * 5;
+                                    y += proceduresLines * 5;
                                     y += 8;
 
                                     // Then show image and figure description if they exist
                                     if (pdfOptions.includeImages && subtopic.image_url) {
+                                        // Check if we need a new page for the image
+                                        if (y + 90 > 270) {  // Image height (80) plus some margin
+                                            doc.addPage();
+                                            y = 20;
+                                        }
+
                                         try {
                                             // Add the image
                                             doc.addImage(
@@ -1005,11 +1030,16 @@ function App() {
                                             );
                                             y += 85;  // Move down past the image
 
-                                            // Add figure description if it exists
+                                            // Check if we need a new page for the figure description
                                             if (subtopic.figure_description) {
+                                                const descriptionLines = doc.splitTextToSize(subtopic.figure_description, 160).length;
+                                                if (y + descriptionLines * 5 + 10 > 270) {
+                                                    doc.addPage();
+                                                    y = 20;
+                                                }
                                                 doc.setFont("times", "italic");
                                                 doc.text(`Figure ${index + 1}: ${subtopic.figure_description}`, 20, y, { maxWidth: 160 });
-                                                y += doc.splitTextToSize(subtopic.figure_description, 160).length * 5;
+                                                y += descriptionLines * 5;
                                             }
                                         } catch (error) {
                                             console.error('Error adding image to PDF:', error);
@@ -1025,25 +1055,39 @@ function App() {
 
                                     // Then show explanation if enabled
                                     if (pdfOptions.includeExplanations) {
+                                        // Check space needed for explanation
+                                        const explanationLines = doc.splitTextToSize(subtopic.explanation || "", 160).length;
+                                        if (y + explanationLines * 5 + 20 > 270) {  // Check if explanation will fit
+                                            doc.addPage();
+                                            y = 20;
+                                        }
+
                                         doc.setFontSize(12);
                                         doc.setFont("times", "bold");
                                         doc.text("Explanation of Output:", 20, y, { underline: true });
                                         y += 6;
                                         doc.setFont("times", "normal");
                                         doc.text(subtopic.explanation || "None", 20, y, { maxWidth: 160 });
-                                        y += doc.splitTextToSize(subtopic.explanation || "", 160).length * 5;
+                                        y += explanationLines * 5;
                                         y += 8;
                                     }
 
                                     // Finally show citations if enabled
                                     if (pdfOptions.includeCitations) {
+                                        // Check space needed for citations
+                                        const citationsLines = doc.splitTextToSize(subtopic.citations || "", 160).length;
+                                        if (y + citationsLines * 5 + 20 > 270) {  // Check if citations will fit
+                                            doc.addPage();
+                                            y = 20;
+                                        }
+
                                         doc.setFontSize(12);
                                         doc.setFont("times", "bold");
                                         doc.text("Citations:", 20, y, { underline: true });
                                         y += 6;
                                         doc.setFont("times", "normal");
                                         doc.text(subtopic.citations || "None", 20, y, { maxWidth: 160 });
-                                        y += doc.splitTextToSize(subtopic.citations || "", 160).length * 5;
+                                        y += citationsLines * 5;
                                         y += 8;
                                     }
 
@@ -1509,6 +1553,12 @@ function App() {
                     let y = 20;
                     
                     for (const question of filteredQuestions) {
+                        // Check if we need a new page for the question
+                        if (y > 250) {  // Leave some margin at bottom of page
+                            doc.addPage();
+                            y = 20;  // Reset y position for new page
+                        }
+
                         doc.setFontSize(20);
                         doc.setFont("times", "bold");
                         doc.text(`Question ${question.number}: ${question.content}`, 20, y);
@@ -1518,10 +1568,23 @@ function App() {
                             const subtopic = question.subtopics[index];
                             const subtopicLabel = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("")[index] || `(${index + 1})`; // A, B, C... fallback to numbers if needed
 
+                            // Check if we need a new page for the subtopic
+                            if (y > 250) {  // Leave some margin at bottom of page
+                                doc.addPage();
+                                y = 20;  // Reset y position for new page
+                            }
+
                             doc.setFontSize(16);
                             doc.setFont("times", "bolditalic");
                             doc.text(`${subtopicLabel}. ${subtopic.title}`, 20, y, { underline: true });
                             y += 10;
+
+                            // Check space needed for procedures
+                            const proceduresLines = doc.splitTextToSize(subtopic.procedures || "", 160).length;
+                            if (y + proceduresLines * 5 + 20 > 270) {  // Check if procedures will fit
+                                doc.addPage();
+                                y = 20;
+                            }
 
                             // First show procedures
                             doc.setFontSize(12);
@@ -1530,11 +1593,17 @@ function App() {
                             y += 6;
                             doc.setFont("times", "normal");
                             doc.text(subtopic.procedures || "None", 20, y, { maxWidth: 160 });
-                            y += doc.splitTextToSize(subtopic.procedures || "", 160).length * 5;
+                            y += proceduresLines * 5;
                             y += 8;
 
                             // Then show image and figure description if they exist
                             if (pdfOptions.includeImages && subtopic.image_url) {
+                                // Check if we need a new page for the image
+                                if (y + 90 > 270) {  // Image height (80) plus some margin
+                                    doc.addPage();
+                                    y = 20;
+                                }
+
                                 try {
                                     // Add the image
                                     doc.addImage(
@@ -1547,11 +1616,16 @@ function App() {
                                     );
                                     y += 85;  // Move down past the image
 
-                                    // Add figure description if it exists
+                                    // Check if we need a new page for the figure description
                                     if (subtopic.figure_description) {
+                                        const descriptionLines = doc.splitTextToSize(subtopic.figure_description, 160).length;
+                                        if (y + descriptionLines * 5 + 10 > 270) {
+                                            doc.addPage();
+                                            y = 20;
+                                        }
                                         doc.setFont("times", "italic");
                                         doc.text(`Figure ${index + 1}: ${subtopic.figure_description}`, 20, y, { maxWidth: 160 });
-                                        y += doc.splitTextToSize(subtopic.figure_description, 160).length * 5;
+                                        y += descriptionLines * 5;
                                     }
                                 } catch (error) {
                                     console.error('Error adding image to PDF:', error);
@@ -1567,25 +1641,39 @@ function App() {
 
                             // Then show explanation if enabled
                             if (pdfOptions.includeExplanations) {
+                                // Check space needed for explanation
+                                const explanationLines = doc.splitTextToSize(subtopic.explanation || "", 160).length;
+                                if (y + explanationLines * 5 + 20 > 270) {  // Check if explanation will fit
+                                    doc.addPage();
+                                    y = 20;
+                                }
+
                                 doc.setFontSize(12);
                                 doc.setFont("times", "bold");
                                 doc.text("Explanation of Output:", 20, y, { underline: true });
                                 y += 6;
                                 doc.setFont("times", "normal");
                                 doc.text(subtopic.explanation || "None", 20, y, { maxWidth: 160 });
-                                y += doc.splitTextToSize(subtopic.explanation || "", 160).length * 5;
+                                y += explanationLines * 5;
                                 y += 8;
                             }
 
                             // Finally show citations if enabled
                             if (pdfOptions.includeCitations) {
+                                // Check space needed for citations
+                                const citationsLines = doc.splitTextToSize(subtopic.citations || "", 160).length;
+                                if (y + citationsLines * 5 + 20 > 270) {  // Check if citations will fit
+                                    doc.addPage();
+                                    y = 20;
+                                }
+
                                 doc.setFontSize(12);
                                 doc.setFont("times", "bold");
                                 doc.text("Citations:", 20, y, { underline: true });
                                 y += 6;
                                 doc.setFont("times", "normal");
                                 doc.text(subtopic.citations || "None", 20, y, { maxWidth: 160 });
-                                y += doc.splitTextToSize(subtopic.citations || "", 160).length * 5;
+                                y += citationsLines * 5;
                                 y += 8;
                             }
 
@@ -1600,7 +1688,7 @@ function App() {
                             doc.addPage();
                             y = 20;
                         }
-                    } //testing
+                    }
 
                     doc.save("LabReport.pdf");
                 }}
