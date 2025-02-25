@@ -490,33 +490,55 @@ function App() {
                 `${BACKEND_URL}/api/lab-reports/${reportId}/questions/${currentQuestion.id}/subtopics`,
                 {
                     title: subtopicTitle,
-                    procedures,
-                    explanation,
-                    citations,
+                    procedures: procedures,
+                    explanation: explanation,
+                    citations: citations,
                     image_url: image,
                     figure_description: figureDescription
+                },
+                {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
                 }
             );
 
-            console.log("Subtopic created:", response.data);
+            console.log("Subtopic created successfully:", response.data);
 
-            // Update the questions array
+            // Update the questions array with the new subtopic including all fields
             setQuestions(prevQuestions => 
                 prevQuestions.map(q => {
                     if (q.id === currentQuestion.id) {
                         return {
                             ...q,
-                            subtopics: [...(q.subtopics || []), response.data]
+                            subtopics: [...q.subtopics, {
+                                id: response.data.id,
+                                title: subtopicTitle,
+                                procedures: procedures,
+                                explanation: explanation,
+                                citations: citations,
+                                image_url: image,
+                                figure_description: figureDescription
+                            }]
                         };
                     }
                     return q;
                 })
             );
 
-            // Update the current question
+            // Update the current question with the new subtopic including all fields
             setCurrentQuestion(prevQuestion => ({
                 ...prevQuestion,
-                subtopics: [...(prevQuestion.subtopics || []), response.data]
+                subtopics: [...prevQuestion.subtopics, {
+                    id: response.data.id,
+                    title: subtopicTitle,
+                    procedures: procedures,
+                    explanation: explanation,
+                    citations: citations,
+                    image_url: image,
+                    figure_description: figureDescription
+                }]
             }));
 
             // Clear the form
