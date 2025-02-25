@@ -1562,7 +1562,7 @@ function App() {
                             doc.addPage();
                             y = 20;
                         }
-                    }
+                    } //testing
 
                     doc.save("LabReport.pdf");
                 }}
