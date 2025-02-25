@@ -553,9 +553,9 @@ function App() {
                 subtopicId: editingSubtopic,
                 data: {
                     title: subtopicTitle,
-                    procedures,
-                    explanation,
-                    citations,
+                    procedures: procedures,
+                    explanation: explanation,
+                    citations: citations,
                     image_url: image,
                     figure_description: figureDescription
                 }
@@ -565,9 +565,9 @@ function App() {
                 `${BACKEND_URL}/api/lab-reports/${reportId}/questions/${currentQuestion.id}/subtopics/${editingSubtopic}`,
                 {
                     title: subtopicTitle,
-                    procedures,
-                    explanation,
-                    citations,
+                    procedures: procedures,
+                    explanation: explanation,
+                    citations: citations,
                     image_url: image,
                     figure_description: figureDescription
                 },
@@ -588,7 +588,15 @@ function App() {
                         return {
                             ...q,
                             subtopics: q.subtopics.map(s => 
-                                s.id === editingSubtopic ? response.data : s
+                                s.id === editingSubtopic ? {
+                                    ...s,
+                                    title: subtopicTitle,
+                                    procedures: procedures,
+                                    explanation: explanation,
+                                    citations: citations,
+                                    image_url: image,
+                                    figure_description: figureDescription
+                                } : s
                             )
                         };
                     }
@@ -600,7 +608,15 @@ function App() {
             setCurrentQuestion(prevQuestion => ({
                 ...prevQuestion,
                 subtopics: prevQuestion.subtopics.map(s =>
-                    s.id === editingSubtopic ? response.data : s
+                    s.id === editingSubtopic ? {
+                        ...s,
+                        title: subtopicTitle,
+                        procedures: procedures,
+                        explanation: explanation,
+                        citations: citations,
+                        image_url: image,
+                        figure_description: figureDescription
+                    } : s
                 )
             }));
 
